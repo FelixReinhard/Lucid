@@ -1,13 +1,25 @@
 use std::fs;
+use crate::utils::LangError;
 
 macro_rules! kw {
     ($sl:expr, $l:literal) => {
-        $sl.push(Token::Keyword($l))
+        $sl.push(TokenData::Keyword($l))
     } 
 }
-
 #[derive(Debug, PartialEq)]
-pub enum Token {
+pub struct Token {
+    pub tk: TokenData,
+    pub line: u32,
+}
+
+impl Token {
+    pub fn same(&self, other: &Token) -> bool {
+        self.tk.is_eq(&other.tk)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenData {
     Keyword(&'static str),
     Identifier(String),
     ParenOpen,
@@ -23,8 +35,8 @@ pub enum Token {
     F64Literal(f64),
     BoolLiteral(bool),
     StringLiteral(String),
-    Arrow,  // =>
-    Equals, // =
+    Arrow,
+    Equals,
     StarEquals,
     SlashEquals,
     MinusEquals,
@@ -33,8 +45,8 @@ pub enum Token {
     LogicalAnd,
     Or,
     And,
-    Eq,  // ==
-    Neq, // !=
+    Eq,
+    Neq, 
     Leq,
     Less,
     Geq,
@@ -51,10 +63,18 @@ pub enum Token {
     PlusPlus,
     MinusMinus,
 }
-#[derive(Debug)]
-pub enum LangError {
-    Unknown,
-    LexingError,
+
+impl TokenData{
+    pub fn is_eq(&self, other: &TokenData) -> bool {
+        match self {
+            TokenData::Identifier(_) => if let TokenData::Identifier(_) = other {true} else {false},
+            TokenData::I64Literal(_) => if let TokenData::I64Literal(_) = other {true} else {false},
+            TokenData::F64Literal(_) => if let TokenData::F64Literal(_) = other {true} else {false},
+            TokenData::BoolLiteral(_) => if let TokenData::BoolLiteral(_) = other {true} else {false},
+            TokenData::StringLiteral(_) => if let TokenData::StringLiteral(_) = other {true} else {false},
+            _ => self == other, 
+        }
+    }
 }
 
 pub fn lex_file(path: &String) -> Result<Vec<Token>, LangError> {
@@ -72,16 +92,16 @@ pub fn lex(code: String) -> Result<Vec<Token>, LangError> {
     
     while lexer.current < lexer.chars.len() {
         match lexer.chars[lexer.current] {
-            '(' => lexer.push(Token::ParenOpen),
-            ')' => lexer.push(Token::ParenClose),
-            '{' => lexer.push(Token::CurlyOpen),
-            '}' => lexer.push(Token::CurlyClose),
-            '[' => lexer.push(Token::BrackOpen),
-            ']' => lexer.push(Token::BrackClose),
-            ',' => lexer.push(Token::Coma),
-            ':' => lexer.push(Token::DoublePoint),
-            ';' => lexer.push(Token::Semicol),
-            '%' => lexer.push(Token::Percent),
+            '(' => lexer.push(TokenData::ParenOpen),
+            ')' => lexer.push(TokenData::ParenClose),
+            '{' => lexer.push(TokenData::CurlyOpen),
+            '}' => lexer.push(TokenData::CurlyClose),
+            '[' => lexer.push(TokenData::BrackOpen),
+            ']' => lexer.push(TokenData::BrackClose),
+            ',' => lexer.push(TokenData::Coma),
+            ':' => lexer.push(TokenData::DoublePoint),
+            ';' => lexer.push(TokenData::Semicol),
+            '%' => lexer.push(TokenData::Percent),
             '=' => lexer.equals(),
             '*' => lexer.star(),
             '/' => lexer.slash(),
@@ -127,11 +147,11 @@ impl Lexer {
         }
     }
 
-    fn push(&mut self, tk: Token) {
-        self.tokens.push(tk);
+    fn push(&mut self, tk: TokenData) {
+        self.tokens.push(Token{tk: tk, line: self.line});
     }
 
-    fn push_and_next(&mut self, tk: Token) {
+    fn push_and_next(&mut self, tk: TokenData) {
         self.push(tk);
         self.next();
     }
@@ -142,7 +162,7 @@ impl Lexer {
 
     fn error(&mut self, message: &str) {
         self.had_error = true;
-        println!("{}: Error {}", self.line, message);
+        println!("Line {} : Error {}", self.line, message);
     }
 
     fn peek(&self, amount: usize) -> Option<char> {
@@ -153,23 +173,15 @@ impl Lexer {
         }
     }
 
-    fn error_if_end(&mut self) -> bool {
-        if self.current >= self.chars.len() {
-            self.error("File ended unexpected");
-            return true;
-        }
-        return false;
-    }
-
     fn equals(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::Equals);
+            self.push(TokenData::Equals);
             return;
         }
         match self.peek(1).unwrap_or('0') {
-            '=' => self.push_and_next(Token::Eq),
-            '>' => self.push_and_next(Token::Arrow),
-            _ => self.push(Token::Equals),
+            '=' => self.push_and_next(TokenData::Eq),
+            '>' => self.push_and_next(TokenData::Arrow),
+            _ => self.push(TokenData::Equals),
         }
     }
 
@@ -207,116 +219,116 @@ impl Lexer {
 
     fn star(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::Times);
+            self.push(TokenData::Times);
             return;
         }
 
         match self.peek(1).unwrap_or('0') {
-            '*' => self.push_and_next(Token::Power),
-            '=' => self.push_and_next(Token::StarEquals),
-            _ => self.push(Token::Times),
+            '*' => self.push_and_next(TokenData::Power),
+            '=' => self.push_and_next(TokenData::StarEquals),
+            _ => self.push(TokenData::Times),
         }
     }
 
     fn slash(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::Slash);
+            self.push(TokenData::Slash);
             return;
         }
 
         match self.peek(1).unwrap_or('0') {
             '/' => self.command_one_line(),
-            '=' => self.push_and_next(Token::SlashEquals),
+            '=' => self.push_and_next(TokenData::SlashEquals),
             '*' => self.command_mult_line(),
-            _ => self.push(Token::Slash),
+            _ => self.push(TokenData::Slash),
         }
     }
 
     fn minus(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::Minus);
+            self.push(TokenData::Minus);
             return;
         }
 
         match self.peek(1).unwrap_or('0') {
-            '-' => self.push_and_next(Token::MinusMinus),
-            '=' => self.push_and_next(Token::MinusEquals),
-            _ => self.push(Token::Minus),
+            '-' => self.push_and_next(TokenData::MinusMinus),
+            '=' => self.push_and_next(TokenData::MinusEquals),
+            _ => self.push(TokenData::Minus),
         }
     }
 
     fn plus(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::Plus);
+            self.push(TokenData::Plus);
             return;
         }
 
         match self.peek(1).unwrap_or('0') {
-            '+' => self.push_and_next(Token::PlusPlus),
-            '=' => self.push_and_next(Token::PlusEquals),
-            _ => self.push(Token::Plus),
+            '+' => self.push_and_next(TokenData::PlusPlus),
+            '=' => self.push_and_next(TokenData::PlusEquals),
+            _ => self.push(TokenData::Plus),
         }
     }
 
     fn and(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::And);
+            self.push(TokenData::And);
             return;
         }
 
         match self.peek(1).unwrap_or('0') {
-            '&' => self.push_and_next(Token::LogicalAnd),
-            _ => self.push(Token::And),
+            '&' => self.push_and_next(TokenData::LogicalAnd),
+            _ => self.push(TokenData::And),
         }
     }
 
     fn or(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::Or);
+            self.push(TokenData::Or);
             return;
         }
 
         match self.peek(1).unwrap_or('0') {
-            '|' => self.push_and_next(Token::LogicalOr),
-            _ => self.push(Token::Or),
+            '|' => self.push_and_next(TokenData::LogicalOr),
+            _ => self.push(TokenData::Or),
         }
     }
 
     fn not(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::Not);
+            self.push(TokenData::Not);
             return;
         }
 
         match self.peek(1).unwrap_or('0') {
-            '=' => self.push_and_next(Token::Neq),
-            _ => self.push(Token::Not),
+            '=' => self.push_and_next(TokenData::Neq),
+            _ => self.push(TokenData::Not),
         }
     }
 
     fn greater(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::Greater);
+            self.push(TokenData::Greater);
             return;
         }
 
         match self.peek(1).unwrap_or('0') {
-            '>' => self.push_and_next(Token::ShiftRight),
-            '=' => self.push_and_next(Token::Geq),
-            _ => self.push(Token::Greater),
+            '>' => self.push_and_next(TokenData::ShiftRight),
+            '=' => self.push_and_next(TokenData::Geq),
+            _ => self.push(TokenData::Greater),
         }
     }
 
     fn less(&mut self) {
         if self.current >= self.chars.len() {
-            self.push(Token::Less);
+            self.push(TokenData::Less);
             return;
         }
 
         match self.peek(1).unwrap_or('0') {
-            '<' => self.push_and_next(Token::ShiftLeft),
-            '=' => self.push_and_next(Token::Leq),
-            _ => self.push(Token::Less),
+            '<' => self.push_and_next(TokenData::ShiftLeft),
+            '=' => self.push_and_next(TokenData::Leq),
+            _ => self.push(TokenData::Less),
         }
     }
 
@@ -342,6 +354,7 @@ impl Lexer {
         if self.peek(1).unwrap_or('a') == '.' {
             self.next();
             let mut decimals: Vec<char> = Vec::new();
+
             while self.peek(1).unwrap_or('a').is_numeric() {
                 self.next();
                 decimals.push(self.chars[self.current]);
@@ -356,9 +369,9 @@ impl Lexer {
                 self.error("Lexer: Problem parsing floating point number literal.");
                 return;
             }
-            self.push(Token::F64Literal(dec_num));
+            self.push(TokenData::F64Literal(dec_num));
         } else {
-            self.push(Token::I64Literal(num));
+            self.push(TokenData::I64Literal(num));
         }
     }
 
@@ -381,7 +394,7 @@ impl Lexer {
         }
 
         if let Ok(ok) = i64::from_str_radix(&digits.iter().collect::<String>(), 16) {
-            self.push(Token::I64Literal(ok));
+            self.push(TokenData::I64Literal(ok));
         } else {
             self.error("Lexer: Problem parsing hex literal.");
         }
@@ -398,7 +411,7 @@ impl Lexer {
         }
         
         if let Ok(ok) = i64::from_str_radix(&digits.iter().collect::<String>(), 2) {
-            self.push(Token::I64Literal(ok));
+            self.push(TokenData::I64Literal(ok));
         } else {
             self.error("Lexer: Problem parsing bin literal");
         }
@@ -419,7 +432,7 @@ impl Lexer {
                     }
                 }, 
                 '"' => {
-                    self.push(Token::StringLiteral(string));
+                    self.push(TokenData::StringLiteral(string));
                     self.next();
                     return;
                 }
@@ -466,8 +479,8 @@ impl Lexer {
         }
         
         match ident.as_str() {
-            "true"  => self.push(Token::BoolLiteral(true)),
-            "false" => self.push(Token::BoolLiteral(false)),
+            "true"  => self.push(TokenData::BoolLiteral(true)),
+            "false" => self.push(TokenData::BoolLiteral(false)),
             "struct" => kw!(self, "struct"),
             "self" => kw!(self, "self"),
             "fn" => kw!(self, "fn"),
@@ -486,7 +499,8 @@ impl Lexer {
             "or" => kw!(self, "or"),
             "and" => kw!(self, "and"),
             "null" => kw!(self, "null"),
-            _ => self.push(Token::Identifier(ident)),
+            "debug" => kw!(self, "debug"), // remove in realease TODO 
+            _ => self.push(TokenData::Identifier(ident)),
         }
     }
 }

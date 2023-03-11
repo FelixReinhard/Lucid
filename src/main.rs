@@ -1,10 +1,9 @@
 mod lexing;
 mod vm;
 mod utils;
+mod compiler;
 
 use crate::lexing::lexer;
-use crate::vm::chunk;
-
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -27,15 +26,13 @@ fn main() {
     if args.len() == 3 && args[2] == "--tokens" {
         println!("{:?}", tokens);
     }
-    
-    let chunk_res = vm::core::compile(tokens); 
+    let chunk_res = compiler::core::compile(tokens); 
     let chunk;
 
-    if let Err(error) = chunk_res {
-        println!("{:?}", error);
-        return;
+    if let Some(c) = chunk_res {
+        chunk = c;
     } else {
-        chunk = chunk_res.unwrap();
+        return;
     }
 
     if args.len() == 3 && args[2] == "--bytecode" {
@@ -47,6 +44,8 @@ fn main() {
     let interpret_res = vm::core::interpret(chunk);
     if let Err(error) = interpret_res {
         println!("{:?}", error);
+    } else {
+        println!("{:?}", interpret_res.unwrap());
     }
 }
 

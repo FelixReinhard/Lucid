@@ -1,5 +1,5 @@
 use crate::vm::instructions::Instruction;
-use crate::vm::values::Constant;
+use crate::utils::Constant;
 
 const MAX_CHUNK_SIZE: u16 = u16::MAX - 1;
 

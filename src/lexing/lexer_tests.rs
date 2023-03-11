@@ -166,7 +166,7 @@ fn string_escape() {
 #[test]
 fn keywords() {
     let res = lex!(
-        "struct self fn let while Fn new int float bool str if else return import or and null"
+        "struct self fn let while Fn new int float bool str if else return import null or and"
     );
     let real = vec![
         TokenData::Keyword("struct"),
@@ -184,9 +184,9 @@ fn keywords() {
         TokenData::Keyword("else"),
         TokenData::Keyword("return"),
         TokenData::Keyword("import"),
-        TokenData::Keyword("or"),
-        TokenData::Keyword("and"),
         TokenData::Keyword("null"),
+        TokenData::LogicalOr,
+        TokenData::LogicalAnd,
     ];
     println!("{:?}", res);
     assert!(vec_eq(res, real));

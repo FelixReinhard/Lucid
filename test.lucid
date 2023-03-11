@@ -1,3 +1,4 @@
-fn main() {
-  let x: str = "Hello World";
-}
+let x = "Hello";
+let y = "World";
+x = "Hewwo";
+debug x + " " + y;

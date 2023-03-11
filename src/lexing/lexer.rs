@@ -1,5 +1,6 @@
 use std::fs;
 use crate::utils::LangError;
+use std::collections::VecDeque;
 
 macro_rules! kw {
     ($sl:expr, $l:literal) => {
@@ -62,6 +63,9 @@ pub enum TokenData {
     Not,
     PlusPlus,
     MinusMinus,
+    Empty,
+    EOF,
+    DEBUG,
 }
 
 impl TokenData{
@@ -77,7 +81,7 @@ impl TokenData{
     }
 }
 
-pub fn lex_file(path: &String) -> Result<Vec<Token>, LangError> {
+pub fn lex_file(path: &String) -> Result<VecDeque<Token>, LangError> {
     let file = fs::read_to_string(path);
     if let Err(_) = file {
         return Err(LangError::Unknown);
@@ -87,7 +91,7 @@ pub fn lex_file(path: &String) -> Result<Vec<Token>, LangError> {
     lex(code)
 }
 
-pub fn lex(code: String) -> Result<Vec<Token>, LangError> {
+pub fn lex(code: String) -> Result<VecDeque<Token>, LangError> {
     let mut lexer = Lexer::new(code);
     
     while lexer.current < lexer.chars.len() {
@@ -120,18 +124,17 @@ pub fn lex(code: String) -> Result<Vec<Token>, LangError> {
             _ => lexer.keyword_ident(), 
         }
         if lexer.had_error {
-            return Err(LangError::LexingError);
+            return Err(LangError::LexingError(lexer.line));
         }
         lexer.next();
     }
-
     return Ok(lexer.tokens);
 }
 
 struct Lexer {
     current: usize,
     chars: Vec<char>,
-    tokens: Vec<Token>,
+    tokens: VecDeque<Token>,
     had_error: bool,
     line: u32,
 }
@@ -141,14 +144,14 @@ impl Lexer {
         Lexer {
             current: 0,
             chars: code.chars().collect(),
-            tokens: Vec::new(),
+            tokens: VecDeque::new(),
             had_error: false,
             line: 0,
         }
     }
 
     fn push(&mut self, tk: TokenData) {
-        self.tokens.push(Token{tk: tk, line: self.line});
+        self.tokens.push_back(Token{tk, line: self.line});
     }
 
     fn push_and_next(&mut self, tk: TokenData) {
@@ -496,10 +499,10 @@ impl Lexer {
             "else" => kw!(self, "else"),
             "return" => kw!(self, "return"),
             "import" => kw!(self, "import"),
-            "or" => kw!(self, "or"),
-            "and" => kw!(self, "and"),
+            "or" => self.push(TokenData::LogicalOr),
+            "and" => self.push(TokenData::LogicalAnd),
             "null" => kw!(self, "null"),
-            "debug" => kw!(self, "debug"), // remove in realease TODO 
+            "debug" => self.push(TokenData::DEBUG), // remove in realease TODO 
             _ => self.push(TokenData::Identifier(ident)),
         }
     }

@@ -1,7 +1,7 @@
 use crate::vm::chunk::*;
 use crate::vm::core::interpret;
 use crate::vm::instructions::*;
-use crate::vm::values::*;
+use crate::utils::{Value, Constant, LangError};
 
 #[test]
 fn constant() {

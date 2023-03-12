@@ -5,7 +5,8 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
-    DEBUG, // Never compiled, only for unit tests.
+    DEBUG, 
+    Dummy, // used for patching jumps
     Return,
     Constant(usize),
     Negate,
@@ -29,6 +30,11 @@ pub enum Instruction {
     DefGlobal(usize), // usize points to vms global table
     GetGlobal(usize),
     SetGlobal(usize),
+    SetLocal(usize),
+    GetLocal(usize),
+    JumpIfFalse(usize),
+    Jump(usize),
+    JumpTo(usize), // sets ip
 }
 
 impl Instruction {
@@ -118,18 +124,6 @@ impl Instruction {
                     Ok(Value::Bool(l.fract() == 0.0 && (l as i64) > r))
                 }
                 _ => Err(LangError::RuntimeMessage("Types cannot be less")),
-            },
-            Instruction::LogicOr => match (left, right) {
-                (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l || r)),
-                _ => Err(LangError::RuntimeMessage(
-                    "Cannot logic or non boolean values",
-                )),
-            },
-            Instruction::LogicAnd => match (left, right) {
-                (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l && r)),
-                _ => Err(LangError::RuntimeMessage(
-                    "Cannot logic and non boolean values",
-                )),
             },
             Instruction::Add => match (left, right) {
                 (Value::Float(l), Value::Float(r)) => Ok(Value::Float(l + r)),

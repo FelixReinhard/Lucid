@@ -1,13 +1,15 @@
 use super::lexer;
 use lexer::{TokenData, Token};
 
+use std::collections::VecDeque;
+
 macro_rules! lex {
     ($l:literal) => {
         lexer::lex(String::from($l)).unwrap()
     };
 }
 
-fn vec_eq(vec1: Vec<Token>, vec2: Vec<TokenData>) -> bool {
+fn vec_eq(vec1: VecDeque<Token>, vec2: Vec<TokenData>) -> bool {
     vec1.iter().zip(vec2).all(|(a, b)| a.tk == b)
 }
 

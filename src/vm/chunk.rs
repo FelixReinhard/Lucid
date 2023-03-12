@@ -1,8 +1,6 @@
 use crate::vm::instructions::Instruction;
 use crate::utils::Constant;
 
-const MAX_CHUNK_SIZE: u16 = u16::MAX - 1;
-
 pub struct Chunk {
     pub code: Vec<Instruction>,
     pub constants: Vec<Constant>,
@@ -19,6 +17,15 @@ impl Chunk {
     pub fn push_instruction(&mut self, instruction: Instruction) -> usize {
         self.code.push(instruction);
         self.code.len() - 1
+    }
+
+    pub fn patch_instruction(&mut self, slot: usize, instruction: Instruction) -> bool {
+        if self.code.len() <= slot {
+            false 
+        } else {
+            self.code[slot] = instruction;
+            true
+        }
     }
 
     pub fn push_constant(&mut self, constant: Constant) -> usize {

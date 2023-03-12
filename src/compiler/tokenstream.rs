@@ -37,6 +37,15 @@ impl TokenStream {
         }
     }
 
+    pub fn check(&self, token_type : TokenData) -> bool {
+       if let Some(tk) = self.peek() {
+            if tk.tk.is_eq(&token_type) {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn get_precedence_of_peek(&mut self) -> Precedence {
         if let Some(t) = self.peek() {
             match t.tk {

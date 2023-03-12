@@ -3,13 +3,14 @@ use crate::utils::{LangError, Value};
 use crate::vm::chunk::Chunk;
 use crate::vm::instructions::Instruction;
 
-pub fn interpret(chunk: Chunk) -> Result<Value, LangError> {
+pub fn interpret(chunk: Chunk, print_stack: bool) -> Result<Value, LangError> {
     let mut interpreter = Interpreter::new(chunk);
-    interpreter.run()
+    interpreter.run(print_stack)
 }
 
 struct Interpreter {
     chunk: Chunk,
+    debug_value: Value,
     ip: usize,
     stack: Vec<Value>,
     globals: Vec<Value>,
@@ -20,6 +21,7 @@ impl Interpreter {
         Interpreter {
             chunk,
             ip: 0,
+            debug_value: Value::Null,
             stack: Vec::new(),
             globals: Vec::new(),
         }
@@ -54,7 +56,7 @@ impl Interpreter {
         }
     }
 
-    fn run(&mut self) -> Result<Value, LangError> {
+    fn run(&mut self, print_stack: bool) -> Result<Value, LangError> {
         loop {
             if self.ip >= self.chunk.code.len() {
                 break;
@@ -62,11 +64,45 @@ impl Interpreter {
 
             let instruction = self.chunk.code[self.ip].clone();
             self.ip += 1;
-
+            if print_stack {
+                println!("STACK: {:?}", self.stack);
+            }
             match instruction {
-                Instruction::DEBUG => println!("{:?}", self.peek().unwrap().to_string()),
+                Instruction::DEBUG => {
+                    let v = self.pop().unwrap_or(Value::Null);
+                    println!("{:?}", v.to_string());
+                    self.debug_value = v;
+                }
+                Instruction::JumpIfFalse(amount) => {
+                    match self.peek() {
+                        Some(val) => {
+                            if let Some(jump) = val.is_falsey() {
+                                self.ip += if jump {amount} else {0};
+                            } else {
+                                return Err(LangError::RuntimeMessage("None boolean value in expression if statement"));
+                            }
+                        },
+                        None => return Err(LangError::RuntimeMessage("Could not peek stack. Seems to be empty")),
+                    }
+                } 
+                Instruction::Jump(amount) => {
+                    self.ip += amount;
+                }
+                Instruction::JumpTo(amount) => {
+                    self.ip = amount;
+                }
                 Instruction::Return => {
                     return Ok(Value::Integer(0));
+                }
+                Instruction::GetLocal(pointer) => {
+                    self.push(self.stack[pointer].clone());
+                }
+                Instruction::SetLocal(pointer) => {
+                    if let Some(v) = self.peek() {
+                        self.stack[pointer] = v;
+                    } else {
+                        return Err(LangError::RuntimeMessage("Could not set local variable"));
+                    }
                 }
                 Instruction::DefGlobal(global) => {
                     let init_value;
@@ -159,10 +195,6 @@ impl Interpreter {
                 _ => {}
             }
         }
-        if self.stack.is_empty() {
-            Ok(Value::Null)
-        } else {
-            Ok(self.stack.pop().unwrap())
-        }
+        Ok(self.debug_value.clone())
     }
 }

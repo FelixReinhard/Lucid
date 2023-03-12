@@ -48,13 +48,47 @@ impl Compiler {
             return;
         }
 
-        while precedence <= tokens.get_precedence_of_peek() { 
+        while precedence <= tokens.get_precedence_of_peek() {
             match tokens.peek_or_none() {
+                TokenData::LogicalAnd => self.logical_and(tokens),
+                TokenData::LogicalOr => self.logical_or(tokens),
                 _ => self.binary(tokens),
             }
         }
     }
-    
+
+    fn logical_and(&mut self, tokens: &mut TokenStream) {
+        let _ = tokens.next();
+
+        let jump = self.emit_get(Instruction::Dummy);
+
+        self.emit(Instruction::Pop);
+        self.parse_precedence(tokens, Precedence::LogicAnd);
+
+        self.patch_jump(
+            jump,
+            Instruction::JumpIfFalse(self.get_instructions_count() - jump),
+        );
+    }
+    // By De Morgans law
+    fn logical_or(&mut self, tokens: &mut TokenStream) {
+        let _ = tokens.next();
+
+        self.emit(Instruction::Not);
+        let jump = self.emit_get(Instruction::Dummy);
+
+        self.emit(Instruction::Pop);
+        self.parse_precedence(tokens, Precedence::LogicOr);
+
+        self.emit(Instruction::Not);
+        self.patch_jump(
+            jump,
+            Instruction::JumpIfFalse(self.get_instructions_count() - jump),
+        );
+
+        self.emit(Instruction::Not);
+    }
+
     fn binary(&mut self, tokens: &mut TokenStream) {
         let operator = tokens.next().unwrap();
 
@@ -83,38 +117,76 @@ impl Compiler {
             TokenData::And => self.emit(Instruction::BitAnd),
             TokenData::ShiftRight => self.emit(Instruction::ShiftRight),
             TokenData::ShiftLeft => self.emit(Instruction::ShiftLeft),
-            _ => self.error_handler.report_error(LangError::ParsingError(operator.line, "Invalid binary op"), tokens), 
+            _ => self.error_handler.report_error(
+                LangError::ParsingError(operator.line, "Invalid binary op"),
+                tokens,
+            ),
+        }
+    }
+
+    fn local(&mut self, tokens: &mut TokenStream, can_assign: bool, slot: usize, line: u32) {
+        let mut is_assigning = false;
+        if tokens.match_token(TokenData::Equals) {
+            is_assigning = true;
+            self.expression(tokens);
+            self.emit(Instruction::SetLocal(slot));
+        } else if tokens.match_token(TokenData::MinusEquals) {
+            println!("{:?}", tokens.peek().unwrap());
+            is_assigning = true;
+            self.emit(Instruction::GetLocal(slot));
+            self.expression(tokens);
+            self.emit(Instruction::Sub);
+            self.emit(Instruction::SetLocal(slot));
+        } else {
+            self.emit(Instruction::GetLocal(slot));
+        }
+
+        if is_assigning && !can_assign {
+            self.error_handler.report_error(
+                LangError::ParsingError(line, "variable: cannot assign here!"),
+                tokens,
+            );
+        }
+    }
+
+    fn global(&mut self, tokens: &mut TokenStream, can_assign: bool, slot: usize, line: u32) {
+        let mut is_assigning = false;
+
+        if tokens.match_token(TokenData::Equals) {
+            is_assigning = true;
+            self.expression(tokens);
+            self.emit(Instruction::SetGlobal(slot));
+        } else {
+            self.emit(Instruction::GetGlobal(slot));
+        }
+
+        if is_assigning && !can_assign {
+            self.error_handler.report_error(
+                LangError::ParsingError(line, "variable: cannot assign here!"),
+                tokens,
+            );
         }
     }
 
     fn variable(&mut self, tokens: &mut TokenStream, can_assign: bool) {
         // ok to unwrap as check has been done
         let identifier = tokens.next().unwrap();
+
         match identifier.tk {
             TokenData::Identifier(ident) => {
-                if let Some(pointer) = self.globals.get(&ident) {
-                    if tokens.match_token(TokenData::Equals) {
-                        if !can_assign {
-                            self.error_handler.report_error(
-                                LangError::ParsingError(
-                                    identifier.line,
-                                    "variable: cannot assign here!",
-                                ),
-                                tokens,
-                            );
-                            return;
-                        }
-                        self.expression(tokens);
-                        self.emit(Instruction::SetGlobal(pointer));
-                    } else {
-                        self.emit(Instruction::GetGlobal(pointer));
+                // first check if a local is found
+                if !self.locals.is_global_scope() {
+                    if let Some(slot) = self.locals.get_local(&ident) {
+                        self.local(tokens, can_assign, slot, identifier.line);
+                        return;
                     }
+                }
+
+                if let Some(slot) = self.globals.get(&ident) {
+                    self.global(tokens, can_assign, slot, identifier.line);
                 } else {
                     self.error_handler.report_error(
-                        LangError::ParsingError(
-                            identifier.line,
-                            "variable: unable to get variable from globals table!.",
-                        ),
+                        LangError::ParsingError(identifier.line, "variable: Undefined variable!."),
                         tokens,
                     );
                 }

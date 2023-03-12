@@ -41,7 +41,7 @@ fn main() {
         chunk.print_code();
     }
 
-    let interpret_res = vm::core::interpret(chunk);
+    let interpret_res = vm::core::interpret(chunk, true); // temp always print stack.
     if let Err(error) = interpret_res {
         println!("{:?}", error);
     } else {

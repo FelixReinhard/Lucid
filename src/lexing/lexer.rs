@@ -119,8 +119,8 @@ pub fn lex(code: String) -> Result<VecDeque<Token>, LangError> {
             '1'..='9' => lexer.number(),
             '0' => lexer.hex_bin_number(),
             '"' => lexer.string_literal(),
-            ' ' => {},
-            '\n' | '\r' => lexer.line += 1,
+            ' ' | '\r' => {},
+            '\n' => lexer.line += 1,
             _ => lexer.keyword_ident(), 
         }
         if lexer.had_error {

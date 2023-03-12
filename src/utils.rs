@@ -67,5 +67,14 @@ impl Value {
             Self::Str(s) => format!("{}", s),
         } 
     }
+    // if value can be interpreted as a bool return this value,
+    pub fn is_falsey(&self) -> Option<bool> {
+        match self {
+            Self::Float(f) => Some(*f == 0.0),
+            Self::Integer(i) => Some(*i == 0),
+            Self::Bool(b) => Some(!*b),
+            _ => None,
+        }
+    }
 }
 

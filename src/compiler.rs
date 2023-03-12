@@ -4,3 +4,4 @@ mod globaltable;
 mod error;
 mod declarations;
 mod expressions;
+mod locals;

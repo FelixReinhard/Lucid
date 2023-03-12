@@ -1,4 +1,9 @@
-let x = "Hello";
-let y = "World";
-x = "Hewwo";
-debug x + " " + y;
+{
+  let rep = 3;
+  rep -= 1;
+  while rep > 0 {
+    rep -= 1;
+    debug rep;
+  }
+}
+debug "test";

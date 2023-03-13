@@ -1,4 +1,5 @@
 use crate::compiler::core::Compiler;
+use crate::compiler::functions::FunctionData;
 use crate::compiler::tokenstream::TokenStream;
 use crate::lexing::lexer::TokenData;
 use crate::utils::{Constant, LangError, Value};
@@ -47,14 +48,36 @@ impl Compiler {
         if !self.error_handler.can_continue() {
             return;
         }
-
         while precedence <= tokens.get_precedence_of_peek() {
             match tokens.peek_or_none() {
                 TokenData::LogicalAnd => self.logical_and(tokens),
                 TokenData::LogicalOr => self.logical_or(tokens),
+                TokenData::ParenOpen => self.call(tokens),
                 _ => self.binary(tokens),
             }
         }
+    }
+
+    fn call(&mut self, tokens: &mut TokenStream) {
+        let open_paren = tokens.next().unwrap();
+
+        let args_count = self.call_arguments(tokens);
+        tokens.consume(TokenData::ParenClose, &mut self.error_handler);
+        self.emit(Instruction::CallFunc(args_count));
+    }
+
+    fn call_arguments(&mut self, tokens: &mut TokenStream) -> u32 {
+        let mut args = 0;
+
+        while !tokens.check(TokenData::ParenClose) {
+            args += 1;
+            self.expression(tokens);
+
+            if !tokens.match_token(TokenData::Coma) {
+                break;
+            }
+        }
+        args
     }
 
     fn logical_and(&mut self, tokens: &mut TokenStream) {
@@ -131,10 +154,41 @@ impl Compiler {
             self.expression(tokens);
             self.emit(Instruction::SetLocal(slot));
         } else if tokens.match_token(TokenData::MinusEquals) {
-            println!("{:?}", tokens.peek().unwrap());
             is_assigning = true;
             self.emit(Instruction::GetLocal(slot));
             self.expression(tokens);
+            self.emit(Instruction::Sub);
+            self.emit(Instruction::SetLocal(slot));
+        } else if tokens.match_token(TokenData::PlusEquals) {
+            is_assigning = true;
+            self.emit(Instruction::GetLocal(slot));
+            self.expression(tokens);
+            self.emit(Instruction::Add);
+            self.emit(Instruction::SetLocal(slot));
+        } else if tokens.match_token(TokenData::StarEquals) {
+            is_assigning = true;
+            self.emit(Instruction::GetLocal(slot));
+            self.expression(tokens);
+            self.emit(Instruction::Mult);
+            self.emit(Instruction::SetLocal(slot));
+        } else if tokens.match_token(TokenData::SlashEquals) {
+            is_assigning = true;
+            self.emit(Instruction::GetLocal(slot));
+            self.expression(tokens);
+            self.emit(Instruction::Div);
+            self.emit(Instruction::SetLocal(slot));
+        } else if tokens.match_token(TokenData::PlusPlus) {
+            is_assigning = true;
+            self.emit(Instruction::GetLocal(slot));
+            let c = self.push_constant(Constant::Integer(1));
+            self.emit(Instruction::Constant(c));
+            self.emit(Instruction::Add);
+            self.emit(Instruction::SetLocal(slot));
+        } else if tokens.match_token(TokenData::MinusMinus) {
+            is_assigning = true;
+            self.emit(Instruction::GetLocal(slot));
+            let c = self.push_constant(Constant::Integer(1));
+            self.emit(Instruction::Constant(c));
             self.emit(Instruction::Sub);
             self.emit(Instruction::SetLocal(slot));
         } else {
@@ -156,10 +210,47 @@ impl Compiler {
             is_assigning = true;
             self.expression(tokens);
             self.emit(Instruction::SetGlobal(slot));
+        } else if tokens.match_token(TokenData::MinusEquals) {
+            is_assigning = true;
+            self.emit(Instruction::GetGlobal(slot));
+            self.expression(tokens);
+            self.emit(Instruction::Sub);
+            self.emit(Instruction::SetGlobal(slot));
+        } else if tokens.match_token(TokenData::PlusEquals) {
+            is_assigning = true;
+            self.emit(Instruction::GetGlobal(slot));
+            self.expression(tokens);
+            self.emit(Instruction::Add);
+            self.emit(Instruction::SetGlobal(slot));
+        } else if tokens.match_token(TokenData::StarEquals) {
+            is_assigning = true;
+            self.emit(Instruction::GetGlobal(slot));
+            self.expression(tokens);
+            self.emit(Instruction::Mult);
+            self.emit(Instruction::SetGlobal(slot));
+        } else if tokens.match_token(TokenData::SlashEquals) {
+            is_assigning = true;
+            self.emit(Instruction::GetGlobal(slot));
+            self.expression(tokens);
+            self.emit(Instruction::Div);
+            self.emit(Instruction::SetGlobal(slot));
+        } else if tokens.match_token(TokenData::PlusPlus) {
+            is_assigning = true;
+            self.emit(Instruction::GetGlobal(slot));
+            let c = self.push_constant(Constant::Integer(1));
+            self.emit(Instruction::Constant(c));
+            self.emit(Instruction::Add);
+            self.emit(Instruction::SetGlobal(slot));
+        } else if tokens.match_token(TokenData::MinusMinus) {
+            is_assigning = true;
+            self.emit(Instruction::GetGlobal(slot));
+            let c = self.push_constant(Constant::Integer(1));
+            self.emit(Instruction::Constant(c));
+            self.emit(Instruction::Sub);
+            self.emit(Instruction::SetGlobal(slot));
         } else {
             self.emit(Instruction::GetGlobal(slot));
         }
-
         if is_assigning && !can_assign {
             self.error_handler.report_error(
                 LangError::ParsingError(line, "variable: cannot assign here!"),
@@ -184,6 +275,8 @@ impl Compiler {
 
                 if let Some(slot) = self.globals.get(&ident) {
                     self.global(tokens, can_assign, slot, identifier.line);
+                } else if let Some(function) = self.functions.get(&ident) {
+                    self.emit(Instruction::FuncRef(function.adress, function.args_count));
                 } else {
                     self.error_handler.report_error(
                         LangError::ParsingError(identifier.line, "variable: Undefined variable!."),

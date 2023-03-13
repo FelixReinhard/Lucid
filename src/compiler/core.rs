@@ -2,6 +2,7 @@ use crate::compiler::error::ErrorHandler;
 use crate::compiler::globaltable::GlobalTable;
 use crate::compiler::locals::Locals;
 use crate::compiler::tokenstream::TokenStream;
+use crate::compiler::functions::FunctionTable;
 use crate::lexer::{Token, TokenData};
 use crate::utils::{Constant, LangError, Value};
 use crate::vm::chunk::Chunk;
@@ -15,10 +16,11 @@ pub fn compile(tokens: VecDeque<Token>) -> Option<Chunk> {
 }
 
 pub struct Compiler {
-    pub chunk: Chunk,
+    chunk: Chunk,
     pub globals: GlobalTable,
     pub error_handler: ErrorHandler,
     pub locals: Locals,
+    pub functions: FunctionTable,
 }
 
 impl Compiler {
@@ -33,6 +35,7 @@ impl Compiler {
             globals: GlobalTable::new(),
             error_handler: ErrorHandler::new(),
             locals: Locals::new(),
+            functions: FunctionTable::new(), 
         }
     }
 
@@ -66,5 +69,13 @@ impl Compiler {
 
     pub fn push_constant(&mut self, constant: Constant) -> usize {
         self.chunk.push_constant(constant)
+    }
+
+    pub fn begin_scope(&mut self) {
+        self.locals.begin_scope();
+    }
+
+    pub fn end_scope(&mut self) {
+        self.locals.end_scope(&mut self.chunk);
     }
 }

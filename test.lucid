@@ -1,9 +1,11 @@
-{
-  let rep = 3;
-  rep -= 1;
-  while rep > 0 {
-    rep -= 1;
-    debug rep;
-  }
+let v = "hello";
+
+fn fib(n) {
+    if n > 0 {
+      debug n; 
+      fib(n-1); 
+    }
+    else => debug n;
 }
-debug "test";
+
+fib(10);

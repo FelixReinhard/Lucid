@@ -35,6 +35,9 @@ pub enum Instruction {
     JumpIfFalse(usize),
     Jump(usize),
     JumpTo(usize), // sets ip
+    JumpRe,
+    CallFunc(u32), // jumps to function add adds callframe
+    FuncRef(usize, u32),
 }
 
 impl Instruction {

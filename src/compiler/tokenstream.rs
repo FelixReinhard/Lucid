@@ -61,6 +61,7 @@ impl TokenStream {
                 TokenData::Or => Precedence::BitOr,
                 TokenData::And => Precedence::BitAnd,
                 TokenData::ShiftLeft | TokenData::ShiftRight => Precedence::Shift,
+                TokenData::ParenOpen => Precedence::Call,
                 _ => Precedence::None,
             }
         } else {

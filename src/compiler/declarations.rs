@@ -28,12 +28,73 @@ impl Compiler {
                 self.emit(Instruction::DEBUG);
             }
             TokenData::Keyword("let") => self.var_declaration(tokens),
+            TokenData::Keyword("fn") => self.function(tokens),
             TokenData::CurlyOpen => self.block(tokens),
             TokenData::Arrow => self.arrow_block(tokens),
             TokenData::Keyword("if") => self.if_statement(tokens),
             TokenData::Keyword("while") => self.while_statement(tokens),
             _ => self.expression_statement(tokens),
         }
+    }
+
+    fn function(&mut self, tokens: &mut TokenStream) {
+        let fn_ = tokens.next().unwrap();
+        // get function name
+        let function_name = tokens.consume_identifier(&mut self.error_handler);
+
+        if !self.error_handler.ok() {
+            return;
+        }
+        // Now we write the functions code, normally one needs to jump over it
+        // when calling we jump here and after that jump back
+        let jump_over_function_code = self.emit_get(Instruction::Dummy);
+
+        tokens.consume(TokenData::ParenOpen, &mut self.error_handler);
+        let arg_amount = self.function_parameters(tokens);
+
+        tokens.consume(TokenData::ParenClose, &mut self.error_handler);
+
+        self.functions
+            .put(function_name, jump_over_function_code + 1, arg_amount);
+        if tokens.check(TokenData::Arrow) {
+            self.arrow_block(tokens);
+        } else if tokens.check(TokenData::CurlyOpen) {
+            self.block(tokens);
+        } else {
+            self.error_handler.report_error(
+                LangError::ParsingError(
+                    fn_.line,
+                    "Wrong token after fn declaration. Expected '{' or '=>'!",
+                ),
+                tokens,
+            );
+            return;
+        }
+        // Pop of all arguments and the funcref
+        for _ in 0..arg_amount+1 {
+            self.emit(Instruction::Pop);
+        }
+        self.emit(Instruction::JumpRe);
+        self.patch_jump(
+            jump_over_function_code,
+            Instruction::JumpTo(self.get_instructions_count() + 1),
+        );
+
+    }
+
+    fn function_parameters(&mut self, tokens: &mut TokenStream) -> u32 {
+        let mut arg_count = 0;
+
+        while !tokens.check(TokenData::ParenClose) {
+            arg_count += 1;
+
+            let var_name = tokens.consume_identifier(&mut self.error_handler);
+            self.locals.add_local(var_name);
+            if !tokens.match_token(TokenData::Coma) {
+                break;
+            }
+        }
+        arg_count
     }
 
     fn while_statement(&mut self, tokens: &mut TokenStream) {
@@ -61,7 +122,10 @@ impl Compiler {
             return;
         }
         self.emit(Instruction::JumpTo(loop_start + 1));
-        self.patch_jump(jump_exit, Instruction::JumpIfFalse(self.get_instructions_count() - jump_exit));
+        self.patch_jump(
+            jump_exit,
+            Instruction::JumpIfFalse(self.get_instructions_count() - jump_exit),
+        );
         self.emit(Instruction::Pop);
     }
 
@@ -97,7 +161,7 @@ impl Compiler {
             );
             self.emit(Instruction::Pop);
 
-            // check the block and compile it. 
+            // check the block and compile it.
             if tokens.check(TokenData::Arrow) {
                 self.arrow_block(tokens);
             } else if tokens.check(TokenData::CurlyOpen) {
@@ -113,21 +177,24 @@ impl Compiler {
                 return;
             }
 
-            self.patch_jump(else_jump, Instruction::Jump(self.get_instructions_count() - else_jump));
+            self.patch_jump(
+                else_jump,
+                Instruction::Jump(self.get_instructions_count() - else_jump),
+            );
         }
     }
 
     fn arrow_block(&mut self, tokens: &mut TokenStream) {
-        self.locals.begin_scope();
+        self.begin_scope();
         tokens.next();
 
         self.statement(tokens);
 
-        self.locals.end_scope(&mut self.chunk);
+        self.end_scope();
     }
 
     fn block(&mut self, tokens: &mut TokenStream) {
-        self.locals.begin_scope();
+        self.begin_scope();
         tokens.next();
 
         while !tokens.check(TokenData::CurlyClose) && !tokens.check(TokenData::EOF) {
@@ -135,7 +202,7 @@ impl Compiler {
         }
 
         tokens.consume(TokenData::CurlyClose, &mut self.error_handler);
-        self.locals.end_scope(&mut self.chunk);
+        self.end_scope();
     }
 
     fn expression_statement(&mut self, tokens: &mut TokenStream) {

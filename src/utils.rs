@@ -1,6 +1,7 @@
 use crate::lexing::lexer::TokenData;
 use std::rc::Rc;
 
+
 #[derive(Debug)]
 pub enum LangError {
     None,
@@ -48,12 +49,13 @@ impl Constant {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Float(f64),
     Integer(i64),
     Bool(bool),
     Str(Rc<String>),
+    Func(usize, u32),
     Null,
 }
 
@@ -65,6 +67,7 @@ impl Value {
             Self::Bool(b) => format!("{}", b),
             Self::Null => "Null".to_string(),
             Self::Str(s) => format!("{}", s),
+            Self::Func(name, _) => format!("fn: <{}>", name),
         } 
     }
     // if value can be interpreted as a bool return this value,

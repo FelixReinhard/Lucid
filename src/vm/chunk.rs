@@ -1,6 +1,7 @@
 use crate::vm::instructions::Instruction;
 use crate::utils::Constant;
 
+#[derive(Debug)]
 pub struct Chunk {
     pub code: Vec<Instruction>,
     pub constants: Vec<Constant>,

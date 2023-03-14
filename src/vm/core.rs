@@ -8,17 +8,35 @@ pub fn interpret(chunk: Chunk, print_stack: bool) -> Result<Value, LangError> {
     interpreter.run(print_stack)
 }
 
+#[derive(Debug)]
 struct CallFrame {
     return_adress: usize,
     ip_offset: usize,
+    args_count: u32,
+    locals_to_pop: u32,
 }
 
 impl CallFrame {
-    fn new(return_adress: usize, ip_offset: usize) -> CallFrame {
+    fn new(
+        return_adress: usize,
+        ip_offset: usize,
+        args_count: u32,
+        locals_to_pop: u32,
+    ) -> CallFrame {
         CallFrame {
             return_adress,
             ip_offset,
+            args_count,
+            locals_to_pop,
         }
+    }
+
+    fn def_local(&mut self) {
+        self.locals_to_pop += 1;
+    }
+
+    fn pop_local(&mut self) {
+        self.locals_to_pop -= 1;
     }
 }
 
@@ -35,7 +53,7 @@ struct Interpreter {
 impl Interpreter {
     fn new(chunk: Chunk) -> Interpreter {
         let mut call_frames: Vec<CallFrame> = Vec::new();
-        call_frames.push(CallFrame::new(0, 0));
+        call_frames.push(CallFrame::new(0, 0, 0, 0));
         Interpreter {
             chunk,
             ip: 0,
@@ -92,7 +110,7 @@ impl Interpreter {
             let instruction = self.chunk.code[self.ip].clone();
             self.ip += 1;
             if print_stack {
-                println!("IP: {}, STACK: {:?}", self.ip, self.stack);
+                println!("IP: {}, STACK: {:?}", self.ip - 1, self.stack);
             }
             match instruction {
                 Instruction::DEBUG => {
@@ -127,24 +145,58 @@ impl Interpreter {
                         .call_frames
                         .get(self.call_frames.len() - 1)
                         .unwrap()
-                        .return_adress;
+                        .return_adress
+                        - 1; // -1 as it gets increased after that.
                     self.call_frames.pop();
+                }
+                Instruction::Return => {
+                    // get the return value of the function and save it for now.
+                    if let Some(top) = self.pop() {
+                        let call_frame = self.call_frames.pop();
+                        match call_frame {
+                            Some(frame) => {
+                                while self.stack.len() >= frame.ip_offset {
+                                    // pop off all locals and the funcref value
+                                    self.pop();
+                                }
+                                self.ip = frame.return_adress - 1;
+                                self.push(top);
+                            }
+                            _ => {
+                                return Err(LangError::RuntimeMessage(
+                                    "Couldnt return from function as no call frame is there",
+                                ));
+                            }
+                        }
+                    } else {
+                        return Err(LangError::RuntimeMessage(
+                            "Return could not get stack top value",
+                        ));
+                    }
                 }
                 Instruction::CallFunc(args_given) => {
                     let args;
                     if let Ok(a) = usize::try_from(args_given) {
                         args = a;
                     } else {
-                        return Err(LangError::RuntimeMessage("Couldnt parse argcoutn (usize) to u32"));
+                        return Err(LangError::RuntimeMessage(
+                            "Couldnt parse argcoutn (usize) to u32",
+                        ));
                     }
-                    if let Value::Func(adress, args_count) = self.stack[self.stack.len() - 1 - args] {
+                    if let Value::Func(adress, args_count) = self.stack[self.stack.len() - 1 - args]
+                    {
                         if args_given != args_count {
-                            return Err(LangError::RuntimeMessage("Called function with wrong number of args"));
+                            return Err(LangError::RuntimeMessage(
+                                "Called function with wrong number of args",
+                            ));
                         }
-                            self.call_frames
-                                .push(CallFrame::new(self.ip + 1, self.stack.len() - args));
-                            self.ip = adress;
-                        
+                        self.call_frames.push(CallFrame::new(
+                            self.ip + 1,
+                            self.stack.len() - args,
+                            args_count,
+                            0,
+                        ));
+                        self.ip = adress;
                     } else {
                         return Err(LangError::RuntimeMessage("Cannot call none function type"));
                     }
@@ -154,13 +206,13 @@ impl Interpreter {
                 Instruction::FuncRef(adress, args_count) => {
                     self.push(Value::Func(adress, args_count));
                 }
-                Instruction::Return => {
-                    return Ok(Value::Integer(0));
-                }
                 Instruction::GetLocal(pointer) => {
                     let pointer = self.get_absolute_pointer(pointer);
+                    println!(
+                        "{:?}",
+                        self.call_frames.get(self.call_frames.len() - 1).unwrap()
+                    );
                     if self.stack.len() <= pointer {
-                        println!("{:?}", instruction);
                         return Err(LangError::RuntimeMessage("Couldnt get local"));
                     }
                     self.push(self.stack[pointer].clone());

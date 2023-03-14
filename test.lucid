@@ -1,11 +1,7 @@
-let v = "hello";
-
+// should implicitly return null,
 fn fib(n) {
-    if n > 0 {
-      debug n; 
-      fib(n-1); 
-    }
-    else => debug n;
+  let y = 2;
+  fn test(t) => return t;
+  return test(n);
 }
-
-fib(10);
+debug fib(1);

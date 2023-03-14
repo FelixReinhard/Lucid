@@ -33,8 +33,24 @@ impl Compiler {
             TokenData::Arrow => self.arrow_block(tokens),
             TokenData::Keyword("if") => self.if_statement(tokens),
             TokenData::Keyword("while") => self.while_statement(tokens),
+            TokenData::Keyword("return") => self.return_statement(tokens),
             _ => self.expression_statement(tokens),
         }
+    }
+
+    fn return_statement(&mut self, tokens: &mut TokenStream) {
+        let _ = tokens.next().unwrap();
+        
+
+        if tokens.match_token(TokenData::Semicol) {
+            // return null;
+            self.emit(Instruction::Constant(2));
+        } else {
+            // emit the value of the expression
+            self.expression(tokens);
+            tokens.consume(TokenData::Semicol, &mut self.error_handler)
+        }
+        self.emit(Instruction::Return);
     }
 
     fn function(&mut self, tokens: &mut TokenStream) {
@@ -50,6 +66,8 @@ impl Compiler {
         let jump_over_function_code = self.emit_get(Instruction::Dummy);
 
         tokens.consume(TokenData::ParenOpen, &mut self.error_handler);
+        self.locals.new_function();
+
         let arg_amount = self.function_parameters(tokens);
 
         tokens.consume(TokenData::ParenClose, &mut self.error_handler);
@@ -74,12 +92,14 @@ impl Compiler {
         for _ in 0..arg_amount+1 {
             self.emit(Instruction::Pop);
         }
+        self.emit(Instruction::Constant(2));
         self.emit(Instruction::JumpRe);
         self.patch_jump(
             jump_over_function_code,
             Instruction::JumpTo(self.get_instructions_count() + 1),
         );
 
+        self.locals.end_function();
     }
 
     fn function_parameters(&mut self, tokens: &mut TokenStream) -> u32 {

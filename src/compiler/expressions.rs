@@ -276,7 +276,11 @@ impl Compiler {
                 if let Some(slot) = self.globals.get(&ident) {
                     self.global(tokens, can_assign, slot, identifier.line);
                 } else if let Some(function) = self.functions.get(&ident) {
-                    self.emit(Instruction::FuncRef(function.adress, function.args_count));
+                    if function.is_native {
+                        self.emit(Instruction::NativeRef(function.id, function.args_count));
+                    } else {
+                        self.emit(Instruction::FuncRef(function.adress, function.args_count));
+                    }
                 } else {
                     self.error_handler.report_error(
                         LangError::ParsingError(identifier.line, "variable: Undefined variable!."),

@@ -3,7 +3,8 @@ pub struct ArgParser {
     tokens: bool,
     stack: bool,
     filename: String,
-    error: bool
+    error: bool,
+    print_res: bool,
 }
 
 impl ArgParser {
@@ -11,11 +12,13 @@ impl ArgParser {
     pub fn new(args: &Vec<String>) -> ArgParser {
         let (mut bytecode, mut tokens, mut stack) = (false, false, false);
         let mut error = false;
+        let mut print_res = false;
         for s in args {
             match s.as_str() {
                 "--bytecode" => bytecode = true,
                 "--tokens" => tokens = true,
                 "--stack" => stack = true,
+                "--print-result" => print_res = true, 
                 _ => {}
             }
         }
@@ -31,7 +34,7 @@ impl ArgParser {
         }
 
 
-        ArgParser{bytecode, tokens, stack, filename, error}
+        ArgParser{bytecode, tokens, stack, filename, error, print_res}
     }
 
     pub fn byte_code(&self) -> bool {
@@ -57,6 +60,10 @@ impl ArgParser {
         } else {
             false
         }
+    }
+
+    pub fn print_res(&self) -> bool {
+        self.print_res
     }
 
     fn wrong_args(&self) {

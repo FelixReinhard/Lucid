@@ -56,12 +56,14 @@ pub enum Value {
     Bool(bool),
     Str(Rc<String>),
     Func(usize, u32),
+    NativeFunc(usize, u32),
     Null,
 }
 
 impl Value {
     pub fn to_string(&self) -> String {
         match self {
+            Self::NativeFunc(id, _) => format!("fn <{}>", id),
             Self::Float(f) => format!("{}", f),
             Self::Integer(i) => format!("{}", i),
             Self::Bool(b) => format!("{}", b),

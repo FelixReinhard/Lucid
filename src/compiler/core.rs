@@ -1,8 +1,8 @@
 use crate::compiler::error::ErrorHandler;
+use crate::compiler::functions::FunctionTable;
 use crate::compiler::globaltable::GlobalTable;
 use crate::compiler::locals::Locals;
 use crate::compiler::tokenstream::TokenStream;
-use crate::compiler::functions::FunctionTable;
 use crate::lexer::{Token, TokenData};
 use crate::utils::{Constant, LangError, Value};
 use crate::vm::chunk::Chunk;
@@ -35,8 +35,9 @@ impl Compiler {
             globals: GlobalTable::new(),
             error_handler: ErrorHandler::new(),
             locals: Locals::new(),
-            functions: FunctionTable::new(), 
+            functions: FunctionTable::new(),
         }
+        .define_natives()
     }
 
     fn compile(mut self, tokens: &mut TokenStream) -> Option<Chunk> {

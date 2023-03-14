@@ -38,6 +38,7 @@ pub enum Instruction {
     JumpRe,
     CallFunc(u32), // jumps to function add adds callframe
     FuncRef(usize, u32),
+    NativeRef(usize, u32)
 }
 
 impl Instruction {

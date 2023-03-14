@@ -1,7 +1,9 @@
-// should implicitly return null,
-fn fib(n) {
-  let y = 2;
-  fn test(t) => return t;
-  return test(n);
+fn test(a, b, c) {
+  let d = 4;
+  
+  fn print_four(dd) => return dd;
+
+  return print_four;
 }
-debug fib(1);
+
+print(test(1, 2, 3)(4));

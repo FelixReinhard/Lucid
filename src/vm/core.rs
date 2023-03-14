@@ -1,7 +1,9 @@
 use crate::lexing::lexer::Token;
+
 use crate::utils::{LangError, Value};
 use crate::vm::chunk::Chunk;
 use crate::vm::instructions::Instruction;
+use crate::vm::native::execute_native_function;
 
 pub fn interpret(chunk: Chunk, print_stack: bool) -> Result<Value, LangError> {
     let mut interpreter = Interpreter::new(chunk);
@@ -183,6 +185,10 @@ impl Interpreter {
                             "Couldnt parse argcoutn (usize) to u32",
                         ));
                     }
+                    if self.stack.len() < 1 + args {
+                        return Err(LangError::RuntimeMessage("Perhaps you forgot a return"));
+                    }
+
                     if let Value::Func(adress, args_count) = self.stack[self.stack.len() - 1 - args]
                     {
                         if args_given != args_count {
@@ -197,6 +203,25 @@ impl Interpreter {
                             0,
                         ));
                         self.ip = adress;
+                    } else if let Value::NativeFunc(id, _args_count) =
+                        self.stack[self.stack.len() - 1 - args]
+                    {
+                        let mut args_list: Vec<Value> = Vec::new();
+                        for _ in 0..args_given {
+                            match self.pop() {
+                                Some(v) => args_list.push(v),
+                                None => {
+                                    return Err(LangError::RuntimeMessage(
+                                        "Wrong amount of arguments to native function",
+                                    ));
+                                }
+                            }
+                        }
+                        self.pop();
+                        match execute_native_function(id, args_list) {
+                            Some(v) => self.push(v),
+                            None => {return Err(LangError::RuntimeMessage("error calling native func."))}
+                        }
                     } else {
                         return Err(LangError::RuntimeMessage("Cannot call none function type"));
                     }
@@ -206,12 +231,11 @@ impl Interpreter {
                 Instruction::FuncRef(adress, args_count) => {
                     self.push(Value::Func(adress, args_count));
                 }
+                Instruction::NativeRef(id, args_count) => {
+                    self.push(Value::NativeFunc(id, args_count));
+                }
                 Instruction::GetLocal(pointer) => {
                     let pointer = self.get_absolute_pointer(pointer);
-                    println!(
-                        "{:?}",
-                        self.call_frames.get(self.call_frames.len() - 1).unwrap()
-                    );
                     if self.stack.len() <= pointer {
                         return Err(LangError::RuntimeMessage("Couldnt get local"));
                     }

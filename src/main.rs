@@ -48,7 +48,9 @@ fn main() {
     if let Err(error) = interpret_res {
         println!("{:?}", error);
     } else {
-        println!("{:?}", interpret_res.unwrap());
+        if arg_parser.print_res() {
+            println!("{:?}", interpret_res.unwrap());
+        }
     }
 }
 

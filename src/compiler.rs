@@ -5,4 +5,5 @@ mod error;
 mod declarations;
 mod expressions;
 mod locals;
+mod native_definitions;
 pub mod functions;

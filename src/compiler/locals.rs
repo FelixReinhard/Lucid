@@ -12,7 +12,7 @@ impl Locals {
         Locals {
             scope_depth: 0,
             locals: Vec::new(),
-            local_call_fame_offsets : Vec::new(),
+            local_call_fame_offsets: Vec::new(),
         }
     }
 
@@ -37,31 +37,53 @@ impl Locals {
     }
 
     pub fn add_local(&mut self, name: String) {
-        self.locals.push(Local{name, scope_depth: self.scope_depth});
+        self.locals.push(Local {
+            name,
+            scope_depth: self.scope_depth,
+        });
     }
 
     pub fn get_local(&self, name: &String) -> Option<usize> {
         for (i, local) in self.locals.iter().enumerate() {
             if name == &local.name {
-                if self.local_call_fame_offsets.len() == 0 {
+                if self.local_call_fame_offsets.is_empty() {
                     return Some(i);
                 }
-                return match self.local_call_fame_offsets.get(self.local_call_fame_offsets.len() - 1) {
-                    Some(offset) => Some(i - offset),
-                    None => Some(i)
+                return match self
+                    .local_call_fame_offsets.last()
+                {
+                    Some(offset) => {
+                        if *offset > i {
+                            // This means the local is a upvalue as it is not in 
+                            // the callframe.
+                            None
+                        } else {
+                            Some(i - offset)
+                        }
+                    }
+                    None => Some(i),
                 };
             }
         }
         None
     }
 
-    pub fn new_function(&mut self) {
-        if self.locals.len() > 0 {
+    pub fn get_upvalue(&self, name: &String) -> Option<usize> {
+        for (i, local) in self.locals.iter().enumerate() {
+            if name == &local.name {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    pub fn new_function(&mut self, ) {
+        if !self.locals.is_empty() {
             self.local_call_fame_offsets.push(self.locals.len());
         }
     }
     pub fn end_function(&mut self) {
-        if self.local_call_fame_offsets.len() > 0 {
+        if !self.local_call_fame_offsets.is_empty() {
             self.local_call_fame_offsets.pop();
         }
     }

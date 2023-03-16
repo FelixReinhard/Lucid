@@ -1,11 +1,21 @@
 use std::collections::HashMap;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
+#[derive(Debug, Clone)]
+pub struct UpValue {
+    pub index: usize,
+    pub is_local: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct FunctionData {
     pub adress: usize,
     pub args_count: u32,
     pub is_native: bool,
     pub id: usize,
+    pub upvalues: Rc<RefCell<Vec<UpValue>>>,
 }
 
 impl FunctionData {
@@ -15,6 +25,7 @@ impl FunctionData {
             args_count,
             is_native: false,
             id: 0,
+            upvalues: Rc::new(RefCell::new(Vec::new())),
         }
     }
     fn new_native(args_count: u32, id: usize) -> FunctionData {
@@ -23,6 +34,7 @@ impl FunctionData {
             args_count,
             is_native: true,
             id,
+            upvalues: Rc::new(RefCell::new(Vec::new())),
         }
     }
 }
@@ -30,6 +42,7 @@ impl FunctionData {
 pub struct FunctionTable {
     functions: HashMap<String, FunctionData>,
     top: usize,
+    current: Vec<String>,
 }
 
 impl FunctionTable {
@@ -37,6 +50,7 @@ impl FunctionTable {
         FunctionTable {
             functions: HashMap::new(),
             top: 0,
+            current: Vec::new(),
         }
     }
 
@@ -48,6 +62,7 @@ impl FunctionTable {
     }
 
     pub fn put(&mut self, key: String, adress: usize, args_count: u32) -> usize {
+        self.enter_function(key.clone());
         self.functions
             .insert(key, FunctionData::new(adress, args_count));
         self.top += 1;
@@ -59,6 +74,23 @@ impl FunctionTable {
             .insert(key, FunctionData::new_native(args_count, id));
         self.top += 1;
         self.top - 1
+    }
+
+    pub fn enter_function(&mut self, name: String) {
+        self.current.push(name);
+    }
+
+    pub fn exit_function(&mut self) {
+        self.current.pop();
+    }
+
+    pub fn add_upvalue(&mut self, upvalue: UpValue) -> Option<usize> {
+        if let Some(func) = self.functions.get_mut(self.current.last().unwrap()) {
+            let mut reference = func.upvalues.borrow_mut();
+            reference.push(upvalue);
+            return Some(reference.len() -1);
+        } 
+        None
     }
 }
 
@@ -77,5 +109,4 @@ impl FunctionTable {
 // - then push all arguments onto the stack
 // - begin a scope
 // - jump to the functions code
-//
 //

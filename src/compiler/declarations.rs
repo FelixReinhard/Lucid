@@ -98,7 +98,7 @@ impl Compiler {
             jump_over_function_code,
             Instruction::JumpTo(self.get_instructions_count() + 1),
         );
-
+        self.functions.exit_function();
         self.locals.end_function();
     }
 

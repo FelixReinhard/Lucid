@@ -1,7 +1,9 @@
 use crate::utils::LangError;
 use crate::utils::Value;
+use crate::compiler::functions::UpValue;
 
 use std::rc::Rc;
+use std::cell::RefCell;
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
@@ -37,8 +39,10 @@ pub enum Instruction {
     JumpTo(usize), // sets ip
     JumpRe,
     CallFunc(u32), // jumps to function add adds callframe
-    FuncRef(usize, u32),
-    NativeRef(usize, u32)
+    FuncRef(usize, u32, Box<Rc<RefCell<Vec<UpValue>>>>),
+    NativeRef(usize, u32),
+    SetUpvalue(usize),
+    GetUpvalue(usize),
 }
 
 impl Instruction {

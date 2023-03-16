@@ -6,8 +6,10 @@ mod args;
 
 use crate::lexing::lexer;
 use crate::args::ArgParser;
+use std::env;
 
 fn main() {
+    env::set_var("RUST_BACKTRACE", "1");
     let args: Vec<String> = std::env::args().collect();
     
     let arg_parser = ArgParser::new(&args);
@@ -17,7 +19,7 @@ fn main() {
 
     // must be ok as len >= 2 
     let filename = arg_parser.filename(); 
-    let tokens_res = lexer::lex_file(&filename);
+    let tokens_res = lexer::lex_file(filename);
     let tokens;
     if let Err(error) = tokens_res {
         println!("{:?}", error);

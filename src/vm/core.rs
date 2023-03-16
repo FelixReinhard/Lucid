@@ -1,9 +1,11 @@
-use crate::lexing::lexer::Token;
-
 use crate::utils::{LangError, Value};
 use crate::vm::chunk::Chunk;
 use crate::vm::instructions::Instruction;
 use crate::vm::native::execute_native_function;
+use crate::compiler::functions::UpValue;
+
+use std::rc::Rc;
+use std::cell::RefCell;
 
 pub fn interpret(chunk: Chunk, print_stack: bool) -> Result<Value, LangError> {
     let mut interpreter = Interpreter::new(chunk);
@@ -16,6 +18,7 @@ struct CallFrame {
     ip_offset: usize,
     args_count: u32,
     locals_to_pop: u32,
+    up_values: Vec<Value>,
 }
 
 impl CallFrame {
@@ -24,21 +27,15 @@ impl CallFrame {
         ip_offset: usize,
         args_count: u32,
         locals_to_pop: u32,
+        up_values: Vec<Value>,
     ) -> CallFrame {
         CallFrame {
             return_adress,
             ip_offset,
             args_count,
             locals_to_pop,
+            up_values,
         }
-    }
-
-    fn def_local(&mut self) {
-        self.locals_to_pop += 1;
-    }
-
-    fn pop_local(&mut self) {
-        self.locals_to_pop -= 1;
     }
 }
 
@@ -55,7 +52,7 @@ struct Interpreter {
 impl Interpreter {
     fn new(chunk: Chunk) -> Interpreter {
         let mut call_frames: Vec<CallFrame> = Vec::new();
-        call_frames.push(CallFrame::new(0, 0, 0, 0));
+        call_frames.push(CallFrame::new(0, 0, 0, 0, Vec::new()));
         Interpreter {
             chunk,
             ip: 0,
@@ -96,11 +93,22 @@ impl Interpreter {
     }
 
     fn get_absolute_pointer(&self, offset: usize) -> usize {
-        self.call_frames
-            .get(self.call_frames.len() - 1)
-            .unwrap()
-            .ip_offset
-            + offset
+        self.call_frames.last().unwrap().ip_offset + offset
+    }
+
+    fn resolve_upvalues(&self, up_values: &Box<Rc<RefCell<Vec<UpValue>>>>) -> Vec<Value> {
+        let mut values = Vec::new();
+        let borrow = up_values.borrow_mut();
+
+        let up_values_iter = borrow.iter();
+        for up_value in up_values_iter {
+            // push a copy of the captured value onto the up_value that reside inside the function
+            // value (Note: Not the reference, as each 'instance' of the funcref can capture
+            // the same variable, but this variable may have a different runtime value).
+            values.push(self.stack[self.get_absolute_pointer(up_value.index)].clone());
+        }
+
+        values
     }
 
     fn run(&mut self, print_stack: bool) -> Result<Value, LangError> {
@@ -182,27 +190,36 @@ impl Interpreter {
                         args = a;
                     } else {
                         return Err(LangError::RuntimeMessage(
-                            "Couldnt parse argcoutn (usize) to u32",
+                            "Couldnt parse argcount (usize) to u32",
                         ));
                     }
                     if self.stack.len() < 1 + args {
                         return Err(LangError::RuntimeMessage("Perhaps you forgot a return"));
                     }
 
-                    if let Value::Func(adress, args_count) = self.stack[self.stack.len() - 1 - args]
+                    if let Value::Func(adress, args_count, up_values) = &self.stack[self.stack.len() - 1 - args]
                     {
-                        if args_given != args_count {
+                        if args_given != *args_count {
                             return Err(LangError::RuntimeMessage(
                                 "Called function with wrong number of args",
                             ));
                         }
+                        // create vec of upvalues, meaning copy the local variables that each
+                        // upvalue refers to into the
+                        let mut up_values_copies = Vec::new();
+
+                        for val in up_values.iter() {
+                            up_values_copies.push(val.clone());
+                        }
+
                         self.call_frames.push(CallFrame::new(
                             self.ip + 1,
                             self.stack.len() - args,
-                            args_count,
+                            *args_count,
                             0,
+                            up_values_copies,
                         ));
-                        self.ip = adress;
+                        self.ip = *adress;
                     } else if let Value::NativeFunc(id, _args_count) =
                         self.stack[self.stack.len() - 1 - args]
                     {
@@ -220,16 +237,44 @@ impl Interpreter {
                         self.pop();
                         match execute_native_function(id, args_list) {
                             Some(v) => self.push(v),
-                            None => {return Err(LangError::RuntimeMessage("error calling native func."))}
+                            None => {
+                                return Err(LangError::RuntimeMessage("error calling native func."))
+                            }
                         }
                     } else {
                         return Err(LangError::RuntimeMessage("Cannot call none function type"));
                     }
                 }
                 // Push the value of the function onto the stack if followed by a CallFunc we pop
-                // this value and execute it.
-                Instruction::FuncRef(adress, args_count) => {
-                    self.push(Value::Func(adress, args_count));
+                // this value and execute it. 
+                // Upvalues 
+                // Consider this program
+                //
+                // fn outer() {
+                //  let x = 10;
+                //  fn inner() return x;
+                //  return inner; (1)
+                // }
+                //
+                // let res = outer()();
+                //
+                // res should be 10. 
+                // To capture the x we must at (1) know that the function inner captures the local
+                // variable x, So at (1) we copy x to the actuall Value::Func object and save it
+                // there, then when calling it we add this value to the up_values of the call
+                // frame. When inside the call of inner() instead of GetLocal we do GetUpvalue
+                // which looks inside the call frame and returns the 0th upvalues. As it is know at
+                // compile time which index the upvalue has compiling this is not a problem.
+                Instruction::FuncRef(adress, args_count, up_values) => {
+                    let up_value_objs = self.resolve_upvalues(&up_values);
+                    self.push(Value::Func(adress, args_count, Box::new(up_value_objs)));
+                }
+                Instruction::GetUpvalue(index) => {
+                    self.push(self.call_frames.last().unwrap().up_values[index].clone());
+                }
+                Instruction::SetUpvalue(index) => {
+                    let last = self.call_frames.len() -1;
+                    self.call_frames[last].up_values[index] = self.peek().unwrap();
                 }
                 Instruction::NativeRef(id, args_count) => {
                     self.push(Value::NativeFunc(id, args_count));

@@ -22,7 +22,7 @@ fn native_input(args: Vec<Value>) -> Option<Value> {
 fn native_println(vals: Vec<Value>) -> Option<Value> {
     if vals.len() == 0 {
         println!();
-    } else if vals.len() == 1 {
+    } else if vals.is_empty() {
         println!("{}", vals.get(0).unwrap().to_string());
     } else {
         let mut res = String::new();

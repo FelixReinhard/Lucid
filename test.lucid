@@ -1,9 +1,7 @@
-fn test(a, b, c) {
-  let d = 4;
-  
-  fn print_four(dd) => return dd;
-
-  return print_four;
+fn yea(y) {
+  let x = 10;
+  fn mid() => return x + 10;
+  return mid;
 }
 
-print(test(1, 2, 3)(4));
+print(yea(2)());

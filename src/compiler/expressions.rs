@@ -1,5 +1,5 @@
 use crate::compiler::core::Compiler;
-use crate::compiler::functions::FunctionData;
+use crate::compiler::functions::{FunctionData, UpValue};
 use crate::compiler::tokenstream::TokenStream;
 use crate::lexing::lexer::TokenData;
 use crate::utils::{Constant, LangError, Value};
@@ -147,109 +147,60 @@ impl Compiler {
         }
     }
 
-    fn local(&mut self, tokens: &mut TokenStream, can_assign: bool, slot: usize, line: u32) {
-        let mut is_assigning = false;
-        if tokens.match_token(TokenData::Equals) {
-            is_assigning = true;
-            self.expression(tokens);
-            self.emit(Instruction::SetLocal(slot));
-        } else if tokens.match_token(TokenData::MinusEquals) {
-            is_assigning = true;
-            self.emit(Instruction::GetLocal(slot));
-            self.expression(tokens);
-            self.emit(Instruction::Sub);
-            self.emit(Instruction::SetLocal(slot));
-        } else if tokens.match_token(TokenData::PlusEquals) {
-            is_assigning = true;
-            self.emit(Instruction::GetLocal(slot));
-            self.expression(tokens);
-            self.emit(Instruction::Add);
-            self.emit(Instruction::SetLocal(slot));
-        } else if tokens.match_token(TokenData::StarEquals) {
-            is_assigning = true;
-            self.emit(Instruction::GetLocal(slot));
-            self.expression(tokens);
-            self.emit(Instruction::Mult);
-            self.emit(Instruction::SetLocal(slot));
-        } else if tokens.match_token(TokenData::SlashEquals) {
-            is_assigning = true;
-            self.emit(Instruction::GetLocal(slot));
-            self.expression(tokens);
-            self.emit(Instruction::Div);
-            self.emit(Instruction::SetLocal(slot));
-        } else if tokens.match_token(TokenData::PlusPlus) {
-            is_assigning = true;
-            self.emit(Instruction::GetLocal(slot));
-            let c = self.push_constant(Constant::Integer(1));
-            self.emit(Instruction::Constant(c));
-            self.emit(Instruction::Add);
-            self.emit(Instruction::SetLocal(slot));
-        } else if tokens.match_token(TokenData::MinusMinus) {
-            is_assigning = true;
-            self.emit(Instruction::GetLocal(slot));
-            let c = self.push_constant(Constant::Integer(1));
-            self.emit(Instruction::Constant(c));
-            self.emit(Instruction::Sub);
-            self.emit(Instruction::SetLocal(slot));
-        } else {
-            self.emit(Instruction::GetLocal(slot));
-        }
-
-        if is_assigning && !can_assign {
-            self.error_handler.report_error(
-                LangError::ParsingError(line, "variable: cannot assign here!"),
-                tokens,
-            );
-        }
-    }
-
-    fn global(&mut self, tokens: &mut TokenStream, can_assign: bool, slot: usize, line: u32) {
+    fn variable_operations(
+        &mut self,
+        tokens: &mut TokenStream,
+        can_assign: bool,
+        get: Instruction,
+        set: Instruction,
+        line: u32,
+    ) {
         let mut is_assigning = false;
 
         if tokens.match_token(TokenData::Equals) {
             is_assigning = true;
             self.expression(tokens);
-            self.emit(Instruction::SetGlobal(slot));
+            self.emit(get);
         } else if tokens.match_token(TokenData::MinusEquals) {
             is_assigning = true;
-            self.emit(Instruction::GetGlobal(slot));
+            self.emit(get);
             self.expression(tokens);
             self.emit(Instruction::Sub);
-            self.emit(Instruction::SetGlobal(slot));
+            self.emit(set);
         } else if tokens.match_token(TokenData::PlusEquals) {
             is_assigning = true;
-            self.emit(Instruction::GetGlobal(slot));
+            self.emit(get);
             self.expression(tokens);
             self.emit(Instruction::Add);
-            self.emit(Instruction::SetGlobal(slot));
+            self.emit(set);
         } else if tokens.match_token(TokenData::StarEquals) {
             is_assigning = true;
-            self.emit(Instruction::GetGlobal(slot));
+            self.emit(get);
             self.expression(tokens);
             self.emit(Instruction::Mult);
-            self.emit(Instruction::SetGlobal(slot));
+            self.emit(set);
         } else if tokens.match_token(TokenData::SlashEquals) {
             is_assigning = true;
-            self.emit(Instruction::GetGlobal(slot));
+            self.emit(get);
             self.expression(tokens);
             self.emit(Instruction::Div);
-            self.emit(Instruction::SetGlobal(slot));
+            self.emit(set);
         } else if tokens.match_token(TokenData::PlusPlus) {
             is_assigning = true;
-            self.emit(Instruction::GetGlobal(slot));
+            self.emit(get);
             let c = self.push_constant(Constant::Integer(1));
             self.emit(Instruction::Constant(c));
             self.emit(Instruction::Add);
-            self.emit(Instruction::SetGlobal(slot));
+            self.emit(set);
         } else if tokens.match_token(TokenData::MinusMinus) {
             is_assigning = true;
-            self.emit(Instruction::GetGlobal(slot));
+            self.emit(get);
             let c = self.push_constant(Constant::Integer(1));
             self.emit(Instruction::Constant(c));
             self.emit(Instruction::Sub);
-            self.emit(Instruction::SetGlobal(slot));
+            self.emit(set);
         } else {
-            self.emit(Instruction::GetGlobal(slot));
+            self.emit(get);
         }
         if is_assigning && !can_assign {
             self.error_handler.report_error(
@@ -263,32 +214,70 @@ impl Compiler {
         // ok to unwrap as check has been done
         let identifier = tokens.next().unwrap();
 
-        match identifier.tk {
-            TokenData::Identifier(ident) => {
-                // first check if a local is found
-                if !self.locals.is_global_scope() {
-                    if let Some(slot) = self.locals.get_local(&ident) {
-                        self.local(tokens, can_assign, slot, identifier.line);
-                        return;
-                    }
+        if let TokenData::Identifier(ident) = identifier.tk {
+            // first check if a global is found
+            if !self.locals.is_global_scope() {
+                if let Some(slot) = self.locals.get_local(&ident) {
+                    self.variable_operations(
+                        tokens,
+                        can_assign,
+                        Instruction::GetLocal(slot),
+                        Instruction::SetLocal(slot),
+                        identifier.line,
+                    );
+                    // self.local(tokens, can_assign, slot, identifier.line);
+                    return;
                 }
+            }
 
-                if let Some(slot) = self.globals.get(&ident) {
-                    self.global(tokens, can_assign, slot, identifier.line);
-                } else if let Some(function) = self.functions.get(&ident) {
-                    if function.is_native {
-                        self.emit(Instruction::NativeRef(function.id, function.args_count));
-                    } else {
-                        self.emit(Instruction::FuncRef(function.adress, function.args_count));
-                    }
+            if let Some(slot) = self.globals.get(&ident) {
+                self.variable_operations(
+                    tokens,
+                    can_assign,
+                    Instruction::GetGlobal(slot),
+                    Instruction::SetGlobal(slot),
+                    identifier.line,
+                );
+                // self.global(tokens, can_assign, slot, identifier.line);
+            } else if let Some(function) = self.functions.get(&ident) {
+                if function.is_native {
+                    self.emit(Instruction::NativeRef(function.id, function.args_count));
+                } else {
+                    // a function also takes a Heap allocated list of upvalues stored in the
+                    // function itself.
+                    self.emit(Instruction::FuncRef(
+                        function.adress,
+                        function.args_count,
+                        Box::new(Rc::clone(&function.upvalues)),
+                    ));
+                }
+            } else if let Some(upval) = self.locals.get_upvalue(&ident) {
+                // we encountered a variable that is captured, so now we need to tell the current
+                // function we are inside of that it needs to capture this variable, to do so we
+                // simply do
+                if let Some(index) = self.functions.add_upvalue(UpValue {
+                    index: upval,
+                    is_local: false,
+                }) {
+                    self.variable_operations(
+                        tokens,
+                        can_assign,
+                        Instruction::GetUpvalue(index),
+                        Instruction::SetUpvalue(index),
+                        identifier.line,
+                    );
                 } else {
                     self.error_handler.report_error(
-                        LangError::ParsingError(identifier.line, "variable: Undefined variable!."),
+                        LangError::ParsingError(identifier.line, "variable: upvalue problem"),
                         tokens,
                     );
                 }
+            } else {
+                self.error_handler.report_error(
+                    LangError::ParsingError(identifier.line, "variable: Undefined variable!."),
+                    tokens,
+                );
             }
-            _ => {} // unreachable
         }
     }
 
@@ -307,23 +296,20 @@ impl Compiler {
     fn literal(&mut self, tokens: &mut TokenStream) {
         // unwrap is safe here as a check has been performed prior to this call
         let token = tokens.next().unwrap();
-        let constant_pointer;
-        match token.tk {
-            TokenData::BoolLiteral(val) => constant_pointer = if val { 0 } else { 1 },
-            TokenData::F64Literal(val) => {
-                constant_pointer = self.push_constant(Constant::Float(val))
+        let constant_pointer = match token.tk {
+            TokenData::BoolLiteral(val) => {
+                if val {
+                    0
+                } else {
+                    1
+                }
             }
-            TokenData::I64Literal(val) => {
-                constant_pointer = self.push_constant(Constant::Integer(val))
-            }
-            TokenData::Keyword("null") => constant_pointer = self.push_constant(Constant::Null),
-            TokenData::StringLiteral(s) => {
-                constant_pointer = self.push_constant(Constant::Str(Rc::new(s)))
-            }
-            _ => {
-                constant_pointer = 0;
-            } // unreachable
-        }
+            TokenData::F64Literal(val) => self.push_constant(Constant::Float(val)),
+            TokenData::I64Literal(val) => self.push_constant(Constant::Integer(val)),
+            TokenData::Keyword("null") => self.push_constant(Constant::Null),
+            TokenData::StringLiteral(s) => self.push_constant(Constant::Str(Rc::new(s))),
+            _ => 0,
+        };
         self.emit(Instruction::Constant(constant_pointer));
     }
 

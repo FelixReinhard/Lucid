@@ -1,7 +1,2 @@
-fn yea(y) {
-  let x = 10;
-  fn mid() => return x + 10;
-  return mid;
-}
-
-print(yea(2)());
+let y = [20, "Helo World"];
+print(y);

@@ -26,6 +26,8 @@ impl Compiler {
 
         match token.tk {
             TokenData::ParenOpen => self.grouping(tokens),
+            TokenData::Keyword("fn") => self.lambda(tokens),
+            TokenData::BrackOpen => self.list(tokens),
             TokenData::Minus | TokenData::Not => self.unary(tokens),
             TokenData::I64Literal(_)
             | TokenData::F64Literal(_)
@@ -53,13 +55,157 @@ impl Compiler {
                 TokenData::LogicalAnd => self.logical_and(tokens),
                 TokenData::LogicalOr => self.logical_or(tokens),
                 TokenData::ParenOpen => self.call(tokens),
+                TokenData::BrackOpen => self.list_access(tokens, precedence <= Precedence::Assign),
                 _ => self.binary(tokens),
             }
         }
     }
 
+    fn lambda(&mut self, tokens: &mut TokenStream) {
+        let fn_ = tokens.next().unwrap();
+
+        if !self.error_handler.ok() {
+            return;
+        }
+        // Now we write the functions code, normally one needs to jump over it
+        // when calling we jump here and after that jump back
+        let jump_over_function_code = self.emit_get(Instruction::Dummy);
+
+        tokens.consume(TokenData::ParenOpen, &mut self.error_handler);
+        self.locals.new_function();
+
+        let arg_amount = self.function_parameters(tokens);
+
+        tokens.consume(TokenData::ParenClose, &mut self.error_handler);
+
+        let lambda = self
+            .functions
+            .put_lambda(jump_over_function_code + 1, arg_amount);
+        if tokens.check(TokenData::Arrow) {
+            self.arrow_block(tokens, true);
+        } else if tokens.check(TokenData::CurlyOpen) {
+            self.block(tokens);
+        } else {
+            self.error_handler.report_error(
+                LangError::ParsingError(
+                    fn_.line,
+                    "Wrong token after fn declaration. Expected '{' or '=>'!",
+                ),
+                tokens,
+            );
+            return;
+        }
+        // Pop of all arguments and the funcref
+        for _ in 0..arg_amount + 1 {
+            self.emit(Instruction::Pop);
+        }
+
+        self.emit(Instruction::Constant(2));
+        self.emit(Instruction::JumpRe);
+        self.patch_jump(
+            jump_over_function_code,
+            Instruction::JumpTo(self.get_instructions_count() + 1),
+        );
+        if let Some(function) = self.functions.get_lambda(lambda) {
+            self.emit(Instruction::FuncRef(
+                function.adress,
+                function.args_count,
+                Box::new(Rc::clone(&function.upvalues)),
+            ));
+        }
+
+        self.functions.exit_function();
+        self.locals.end_function();
+    }
+
+    fn list_access(&mut self, tokens: &mut TokenStream, can_assign: bool) {
+        let brack = tokens.next().unwrap();
+
+        self.expression(tokens);
+
+        tokens.consume(TokenData::BrackClose, &mut self.error_handler);
+
+        let set = Instruction::SetList;
+        let get = Instruction::AccessList;
+
+        let mut is_assigning = false;
+        if tokens.match_token(TokenData::Equals) {
+            is_assigning = true;
+            self.expression(tokens);
+            self.emit(Instruction::SetList);
+        } else if tokens.match_token(TokenData::MinusEquals) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            self.expression(tokens);
+            self.emit(Instruction::Sub);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::PlusEquals) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            self.expression(tokens);
+            self.emit(Instruction::Add);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::StarEquals) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            self.expression(tokens);
+            self.emit(Instruction::Mult);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::SlashEquals) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            self.expression(tokens);
+            self.emit(Instruction::Div);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::PlusPlus) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            let c = self.push_constant(Constant::Integer(1));
+            self.emit(Instruction::Constant(c));
+            self.emit(Instruction::Add);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::MinusMinus) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            let c = self.push_constant(Constant::Integer(1));
+            self.emit(Instruction::Constant(c));
+            self.emit(Instruction::Sub);
+            self.emit(set);
+        } else {
+            self.emit(get);
+        }
+        if is_assigning && !can_assign {
+            self.error_handler.report_error(
+                LangError::ParsingError(brack.line, "list: cannot assign here!"),
+                tokens,
+            );
+        }
+    }
+
+    // we push each expression onto the stack then after we
+    fn list(&mut self, tokens: &mut TokenStream) {
+        let _ = tokens.next().unwrap();
+        let mut len = 0;
+        while !tokens.check(TokenData::BrackClose) {
+            self.expression(tokens);
+            len += 1;
+
+            if !tokens.match_token(TokenData::Coma) {
+                break;
+            }
+        }
+        tokens.consume(TokenData::BrackClose, &mut self.error_handler);
+        self.emit(Instruction::DefList(len));
+    }
+
     fn call(&mut self, tokens: &mut TokenStream) {
-        let open_paren = tokens.next().unwrap();
+        let _ = tokens.next().unwrap();
 
         let args_count = self.call_arguments(tokens);
         tokens.consume(TokenData::ParenClose, &mut self.error_handler);
@@ -156,11 +302,10 @@ impl Compiler {
         line: u32,
     ) {
         let mut is_assigning = false;
-
         if tokens.match_token(TokenData::Equals) {
             is_assigning = true;
             self.expression(tokens);
-            self.emit(get);
+            self.emit(set);
         } else if tokens.match_token(TokenData::MinusEquals) {
             is_assigning = true;
             self.emit(get);
@@ -333,6 +478,7 @@ impl Compiler {
             TokenData::Or => Precedence::BitOr,
             TokenData::And => Precedence::BitAnd,
             TokenData::ShiftLeft | TokenData::ShiftRight => Precedence::Shift,
+            TokenData::Keyword("fn") => Precedence::Lambda,
             _ => Precedence::None,
         }
     }

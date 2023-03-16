@@ -43,6 +43,10 @@ pub enum Instruction {
     NativeRef(usize, u32),
     SetUpvalue(usize),
     GetUpvalue(usize),
+    DefList(usize),
+    AccessList,
+    SetList,
+    Dup(usize), // how many stack elements should be copied
 }
 
 impl Instruction {

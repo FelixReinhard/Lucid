@@ -5,8 +5,19 @@ pub fn execute_native_function(id: usize, args: Vec<Value>) -> Option<Value> {
     match id {
         0 => native_println(args),
         1 => native_input(args),
+        2 => native_len(args),
         _ => None,
     }
+}
+
+fn native_len(args: Vec<Value>) -> Option<Value> {
+    if args.len() == 1 {
+        if let Some(Value::List(ls)) = args.get(0) {
+            let borrow = ls.borrow();
+            return Some(Value::Integer(borrow.len() as i64));
+        }
+    }
+    None
 }
 
 fn native_input(args: Vec<Value>) -> Option<Value> {

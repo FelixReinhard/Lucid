@@ -21,21 +21,20 @@ impl Compiler {
             return;
         }
         match peeked.tk {
-            TokenData::DEBUG => {
-                tokens.next();
-                self.expression(tokens);
-                tokens.consume(TokenData::Semicol, &mut self.error_handler);
-                self.emit(Instruction::DEBUG);
-            }
             TokenData::Keyword("let") => self.var_declaration(tokens),
+            TokenData::Keyword("struct") => self.struct_declaration(tokens),
             TokenData::Keyword("fn") => self.function(tokens),
             TokenData::CurlyOpen => self.block(tokens),
-            TokenData::Arrow => self.arrow_block(tokens),
+            TokenData::Arrow => self.arrow_block(tokens, false),
             TokenData::Keyword("if") => self.if_statement(tokens),
             TokenData::Keyword("while") => self.while_statement(tokens),
             TokenData::Keyword("return") => self.return_statement(tokens),
             _ => self.expression_statement(tokens),
         }
+    }
+
+    fn struct_declaration(&mut self, tokens: &mut TokenStream) {
+
     }
 
     fn return_statement(&mut self, tokens: &mut TokenStream) {
@@ -75,7 +74,7 @@ impl Compiler {
         self.functions
             .put(function_name, jump_over_function_code + 1, arg_amount);
         if tokens.check(TokenData::Arrow) {
-            self.arrow_block(tokens);
+            self.arrow_block(tokens, false);
         } else if tokens.check(TokenData::CurlyOpen) {
             self.block(tokens);
         } else {
@@ -102,7 +101,7 @@ impl Compiler {
         self.locals.end_function();
     }
 
-    fn function_parameters(&mut self, tokens: &mut TokenStream) -> u32 {
+    pub fn function_parameters(&mut self, tokens: &mut TokenStream) -> u32 {
         let mut arg_count = 0;
 
         while !tokens.check(TokenData::ParenClose) {
@@ -128,7 +127,7 @@ impl Compiler {
 
         // Block
         if tokens.check(TokenData::Arrow) {
-            self.arrow_block(tokens);
+            self.arrow_block(tokens, false);
         } else if tokens.check(TokenData::CurlyOpen) {
             self.block(tokens);
         } else {
@@ -158,7 +157,7 @@ impl Compiler {
         self.emit_get(Instruction::Pop);
 
         if tokens.check(TokenData::Arrow) {
-            self.arrow_block(tokens);
+            self.arrow_block(tokens, false);
         } else if tokens.check(TokenData::CurlyOpen) {
             self.block(tokens);
         } else {
@@ -183,7 +182,7 @@ impl Compiler {
 
             // check the block and compile it.
             if tokens.check(TokenData::Arrow) {
-                self.arrow_block(tokens);
+                self.arrow_block(tokens, false);
             } else if tokens.check(TokenData::CurlyOpen) {
                 self.block(tokens);
             } else {
@@ -204,20 +203,22 @@ impl Compiler {
         }
     }
 
-    fn arrow_block(&mut self, tokens: &mut TokenStream) {
+    pub fn arrow_block(&mut self, tokens: &mut TokenStream, add_semicol_after: bool) {
         self.begin_scope();
         tokens.next();
 
         self.statement(tokens);
-
+        if add_semicol_after {
+            tokens.tokens.push_front(Token{tk: TokenData::Semicol, line: 1});
+        }
         self.end_scope();
     }
 
-    fn block(&mut self, tokens: &mut TokenStream) {
+    pub fn block(&mut self, tokens: &mut TokenStream) {
         self.begin_scope();
         tokens.next();
 
-        while !tokens.check(TokenData::CurlyClose) && !tokens.check(TokenData::EOF) {
+        while !tokens.check(TokenData::CurlyClose) && !tokens.check(TokenData::EOF) &&!tokens.tokens.is_empty() {
             self.declaration(tokens);
         }
 

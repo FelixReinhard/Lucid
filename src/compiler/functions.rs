@@ -43,6 +43,7 @@ pub struct FunctionTable {
     functions: HashMap<String, FunctionData>,
     top: usize,
     current: Vec<String>,
+    lambda_count: usize,
 }
 
 impl FunctionTable {
@@ -51,6 +52,7 @@ impl FunctionTable {
             functions: HashMap::new(),
             top: 0,
             current: Vec::new(),
+            lambda_count: 0,
         }
     }
 
@@ -67,6 +69,24 @@ impl FunctionTable {
             .insert(key, FunctionData::new(adress, args_count));
         self.top += 1;
         self.top - 1
+    }
+
+    pub fn put_lambda(&mut self, adress: usize, args_count: u32) -> usize {
+        let key = format!("{}", self.lambda_count);
+        self.lambda_count += 1;
+
+        self.enter_function(key.clone());
+        self.functions
+            .insert(key, FunctionData::new(adress, args_count));
+        self.top += 1;
+        self.lambda_count - 1
+    }
+
+    pub fn get_lambda(&self, key: usize) -> Option<&FunctionData> {
+        match self.functions.get(&format!("{}", key)) {
+            Some(p) => Some(p),
+            None => None,
+        }
     }
 
     pub fn add_native(&mut self, key: String, id: usize, args_count: u32) -> usize {

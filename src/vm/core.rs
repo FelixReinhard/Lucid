@@ -1,11 +1,11 @@
+use crate::compiler::functions::UpValue;
 use crate::utils::{LangError, Value};
 use crate::vm::chunk::Chunk;
 use crate::vm::instructions::Instruction;
 use crate::vm::native::execute_native_function;
-use crate::compiler::functions::UpValue;
 
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 pub fn interpret(chunk: Chunk, print_stack: bool) -> Result<Value, LangError> {
     let mut interpreter = Interpreter::new(chunk);
@@ -76,7 +76,6 @@ impl Interpreter {
         match self.stack.pop() {
             Some(x) => Some(x),
             None => {
-                let _ = self.error("Stack is empty");
                 None
             }
         }
@@ -120,7 +119,11 @@ impl Interpreter {
             let instruction = self.chunk.code[self.ip].clone();
             self.ip += 1;
             if print_stack {
-                println!("IP: {}, STACK: {:?}", self.ip - 1, self.stack);
+                println!(
+                    "IP: {}, STACK: [{}]",
+                    self.ip - 1,
+                    self.stack.iter().map(|v| format!("{}, ", v.to_debug())).collect::<String>()
+                );
             }
             match instruction {
                 Instruction::DEBUG => {
@@ -197,7 +200,8 @@ impl Interpreter {
                         return Err(LangError::RuntimeMessage("Perhaps you forgot a return"));
                     }
 
-                    if let Value::Func(adress, args_count, up_values) = &self.stack[self.stack.len() - 1 - args]
+                    if let Value::Func(adress, args_count, up_values) =
+                        &self.stack[self.stack.len() - 1 - args]
                     {
                         if args_given != *args_count {
                             return Err(LangError::RuntimeMessage(
@@ -246,8 +250,8 @@ impl Interpreter {
                     }
                 }
                 // Push the value of the function onto the stack if followed by a CallFunc we pop
-                // this value and execute it. 
-                // Upvalues 
+                // this value and execute it.
+                // Upvalues
                 // Consider this program
                 //
                 // fn outer() {
@@ -258,7 +262,7 @@ impl Interpreter {
                 //
                 // let res = outer()();
                 //
-                // res should be 10. 
+                // res should be 10.
                 // To capture the x we must at (1) know that the function inner captures the local
                 // variable x, So at (1) we copy x to the actuall Value::Func object and save it
                 // there, then when calling it we add this value to the up_values of the call
@@ -273,7 +277,7 @@ impl Interpreter {
                     self.push(self.call_frames.last().unwrap().up_values[index].clone());
                 }
                 Instruction::SetUpvalue(index) => {
-                    let last = self.call_frames.len() -1;
+                    let last = self.call_frames.len() - 1;
                     self.call_frames[last].up_values[index] = self.peek().unwrap();
                 }
                 Instruction::NativeRef(id, args_count) => {
@@ -326,6 +330,55 @@ impl Interpreter {
                     }
                     self.globals.remove(global);
                     self.globals.insert(global, init_value);
+                }
+                Instruction::DefList(init_amount) => {
+                    let mut ls = Vec::new();
+                    for _ in 0..init_amount {
+                        if let Some(val) = self.pop() {
+                            ls.push(val);
+                        } else {
+                            return Err(LangError::RuntimeMessage(
+                                "Could not init list, not enough args",
+                            ));
+                        }
+                    }
+                    ls.reverse();
+                    self.push(Value::List(Box::new(Rc::new(RefCell::new(ls)))));
+                }
+                Instruction::SetList => {
+                    // let new_val = self.pop();
+                    // let index = self.pop();
+                    // let list_val = self.pop();
+                    match (self.pop(), self.pop(), self.peek()) {
+                        (Some(new_val), Some(Value::Integer(index)), Some(Value::List(ls_vec))) => {
+                            let mut borrow = ls_vec.borrow_mut();
+                            borrow[index as usize] = new_val;
+                        }
+                        _ => {
+                            return Err(LangError::RuntimeMessage(
+                                "Error while trying to set list element",
+                            ));
+                        }
+                    }
+                }
+                Instruction::AccessList => {
+                    if let Some(Value::Integer(index)) = self.pop() {
+                        if let Some(Value::List(ls)) = self.pop() {
+                            let borrow = ls.borrow();
+                            if let Some(val) = borrow.get(index as usize) {
+                                self.push(val.clone());
+                                continue;
+                            }
+                        }
+                    }
+                    return Err(LangError::RuntimeMessage(
+                        "Could not pop integer for array access",
+                    ));
+                }
+                Instruction::Dup(amount) => {
+                    for i in self.stack.len() - amount..self.stack.len() {
+                        self.push(self.stack[i].clone());
+                    }
                 }
                 Instruction::Constant(c) => {
                     let constant = &self.chunk.constants[c];

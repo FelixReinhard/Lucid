@@ -64,6 +64,7 @@ pub enum TokenData {
     PlusPlus,
     MinusMinus,
     Empty,
+    Dot,
     EOF,
     DEBUG,
 }
@@ -106,6 +107,7 @@ pub fn lex(code: String) -> Result<VecDeque<Token>, LangError> {
             ':' => lexer.push(TokenData::DoublePoint),
             ';' => lexer.push(TokenData::Semicol),
             '%' => lexer.push(TokenData::Percent),
+            '.' => lexer.push(TokenData::Dot),
             '=' => lexer.equals(),
             '*' => lexer.star(),
             '/' => lexer.slash(),

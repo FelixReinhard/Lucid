@@ -214,6 +214,18 @@ impl Interpreter {
                         ));
                     }
                 }
+                Instruction::Struct(map) => {
+                    let mut values = Vec::new();
+                    for _ in 0..map.len() {
+                        if let Some(val) = self.pop() {
+                            values.push(val);
+                        } else {
+                            return Err(LangError::RuntimeMessage("Couldnt pop"));
+                        }
+                    }
+                    values.reverse();
+                    self.push(Value::StructInstance(Rc::new(Box::new(RefCell::new(values))) ,map));
+                }
                 Instruction::CallFunc(args_given) => {
                     let args;
                     if let Ok(a) = usize::try_from(args_given) {
@@ -383,6 +395,26 @@ impl Interpreter {
                     return Err(LangError::RuntimeMessage(
                         "Could not pop integer for array access",
                     ));
+                }
+                Instruction::StructGet(name) => {
+                    if let Some(Value::StructInstance(values, names)) = self.pop() {
+                        self.push(values.borrow()[*names.get(&*name).unwrap()].clone() );
+                    } else {
+                        return Err(LangError::RuntimeMessage(
+                            "Could not pop struct for get",
+                        ));
+                    }
+                }
+                Instruction::StructSet(name) => {
+                    let val = self.pop().unwrap();
+                    if let Some(Value::StructInstance(values, names)) = self.peek() {
+                        let mut borrow = values.borrow_mut();
+                        borrow[*names.get(&*name).unwrap()] = val; 
+                    } else {
+                        return Err(LangError::RuntimeMessage(
+                            "Could not pop struct for get",
+                        ));
+                    }
                 }
                 Instruction::Dup(amount) => {
                     for i in self.stack.len() - amount..self.stack.len() {

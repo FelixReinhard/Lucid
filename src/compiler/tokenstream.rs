@@ -63,6 +63,7 @@ impl TokenStream {
                 TokenData::ShiftLeft | TokenData::ShiftRight => Precedence::Shift,
                 TokenData::ParenOpen => Precedence::Call,
                 TokenData::BrackOpen => Precedence::Call,
+                TokenData::Dot => Precedence::Call,
                 _ => Precedence::None,
             }
         } else {

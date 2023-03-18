@@ -1,12 +1,12 @@
 use crate::compiler::core::Compiler;
-use crate::compiler::functions::{FunctionData};
+use crate::compiler::functions::FunctionData;
 use crate::compiler::tokenstream::TokenStream;
 use crate::lexing::lexer::TokenData;
 use crate::utils::{Constant, LangError, Value};
 use crate::vm::instructions::Instruction;
 
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 impl Compiler {
     pub fn expression(&mut self, tokens: &mut TokenStream) {
@@ -58,30 +58,103 @@ impl Compiler {
                 TokenData::LogicalOr => self.logical_or(tokens),
                 TokenData::ParenOpen => self.call(tokens),
                 TokenData::BrackOpen => self.list_access(tokens, precedence <= Precedence::Assign),
+                TokenData::Dot => self.struct_access(tokens, precedence <= Precedence::Assign),
                 _ => self.binary(tokens),
             }
         }
     }
 
-    fn struct_instance(&mut self, tokens: &mut TokenStream) {
-        let new = tokens.next().unwrap();
+    fn struct_access(&mut self, tokens: &mut TokenStream, can_assign: bool) {
+        let dot = tokens.next().unwrap();
+        let field = tokens.consume_identifier(&mut self.error_handler);
 
-        let struct_name = tokens.consume_identifier(&mut self.error_handler);
+        let set = Instruction::StructSet(Box::new(field.clone()));
+        let get = Instruction::StructGet(Box::new(field));
 
-        if let Some(s) = self.structs.get(&struct_name) {
-            if tokens.match_token(TokenData::ParenOpen) {
-
-            } else {
-                for _ in 0..s.field_names.len() {
-
-                }
-            }
+        let mut is_assigning = false;
+        if tokens.match_token(TokenData::Equals) {
+            is_assigning = true;
+            self.expression(tokens);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::MinusEquals) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            self.expression(tokens);
+            self.emit(Instruction::Sub);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::PlusEquals) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            self.expression(tokens);
+            self.emit(Instruction::Add);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::StarEquals) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            self.expression(tokens);
+            self.emit(Instruction::Mult);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::SlashEquals) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            self.expression(tokens);
+            self.emit(Instruction::Div);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::PlusPlus) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            let c = self.push_constant(Constant::Integer(1));
+            self.emit(Instruction::Constant(c));
+            self.emit(Instruction::Add);
+            self.emit(set);
+        } else if tokens.match_token(TokenData::MinusMinus) {
+            is_assigning = true;
+            self.emit(Instruction::Dup(2));
+            self.emit(get);
+            let c = self.push_constant(Constant::Integer(1));
+            self.emit(Instruction::Constant(c));
+            self.emit(Instruction::Sub);
+            self.emit(set);
         } else {
+            self.emit(get);
+        }
+        if is_assigning && !can_assign {
             self.error_handler.report_error(
-                LangError::ParsingError(new.line, "Undefined struct"),
+                LangError::ParsingError(dot.line, "list: cannot assign here!"),
                 tokens,
             );
         }
+    }
+
+    fn struct_instance(&mut self, tokens: &mut TokenStream) {
+        let _ = tokens.next().unwrap();
+
+        let struct_name = tokens.consume_identifier(&mut self.error_handler);
+
+        let s = self.structs.get(&struct_name).unwrap();
+
+        if tokens.match_token(TokenData::ParenOpen) {
+            while !tokens.check(TokenData::ParenClose) {
+                self.expression(tokens);
+
+                if !tokens.match_token(TokenData::Coma) {
+                    break;
+                }
+            }
+            tokens.consume(TokenData::ParenClose, &mut self.error_handler);
+        } else {
+            for _ in 0..s.field_names.len() {
+                self.emit(Instruction::Constant(2));
+            }
+        }
+        let map = s.get_name_map();
+        let struct_instruction = Instruction::Struct(Box::new(map));
+        self.emit(struct_instruction);
     }
 
     fn lambda(&mut self, tokens: &mut TokenStream) {
@@ -132,7 +205,7 @@ impl Compiler {
         if let Some(function) = self.functions.get_lambda(lambda) {
             self.emit(Instruction::FuncRef(
                 function.adress,
-                function.args_count, 
+                function.args_count,
                 Box::new(Rc::new(RefCell::new(function.upvalues.clone()))),
             ));
         }
@@ -424,16 +497,16 @@ impl Compiler {
                         Box::new(Rc::new(RefCell::new(function.upvalues.clone()))),
                     ));
                 }
-                // First check if this variable is maybe in the locals in a higher call frame 
-                // if yes then it returns the place on the stack of the variable in relation 
-                // to the callframe and the amount of call frames one needs to go up 
+                // First check if this variable is maybe in the locals in a higher call frame
+                // if yes then it returns the place on the stack of the variable in relation
+                // to the callframe and the amount of call frames one needs to go up
             } else if let Some((index, call_frame_diff)) = self.locals.get_upvalue(&ident) {
                 // Here we have the index in relation to the callframe that is located
-                // call_frame_diff above the current callframe. 
+                // call_frame_diff above the current callframe.
 
                 // now if call_frame_diff is 1 then that means we capture a variable that is a
-                // local in the current call_frame for example 
-                // 
+                // local in the current call_frame for example
+                //
                 // fn test() {
                 //  let x = 10;
                 //  fn test2() => x;

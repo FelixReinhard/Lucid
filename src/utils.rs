@@ -86,20 +86,18 @@ impl Value {
             Self::Func(name, _, _) => format!("fn: <{}>", name),
             Self::Shared(val) => val.borrow().to_string(),
             Self::StructInstance(ls, map) => {
-                let mut s = format!(
+                let s = format!(
                     "struct names: ({}), values: ({})",
                     ls.borrow().iter().fold(String::new(), |acc, x| format!(
                         "{}{}",
                         acc,
-                        format!(", {}", x.to_string())
+                        format!("{}, ", x.to_string())
                     )),
                     map.iter().fold(String::new(), |acc, (key, value)| format!(
-                        "{}, {}{}",
-                        acc, key, value
+                        "{}:{}, {}",
+                        key, value, acc
                     )),
                 );
-                s.remove(1);
-                s.remove(1);
                 s
             }
             Self::List(ls) => {
@@ -129,24 +127,22 @@ impl Value {
             Self::Func(name, _, _) => format!("fn: <{}>", name),
             Self::Shared(val) => val.borrow().to_debug(),
             Self::StructInstance(ls, map) => {
-                let mut s = format!(
+                let s = format!(
                     "struct names: ({}), values: ({})",
                     ls.borrow().iter().fold(String::new(), |acc, x| format!(
                         "{}{}",
                         acc,
-                        format!(", {}", x.to_string())
+                        format!("{}, ", x.to_string())
                     )),
                     map.iter().fold(String::new(), |acc, (key, value)| format!(
-                        "{}, {}{}",
-                        acc, key, value
+                        "{}:{}, {}",
+                        key, value, acc
                     )),
                 );
-                s.remove(1);
-                s.remove(1);
                 s
             }
             Self::List(ls) => {
-                let mut s = format!(
+                let s = format!(
                     "[{}]",
                     ls.borrow().iter().fold(String::new(), |acc, x| format!(
                         "{}{}",
@@ -154,8 +150,6 @@ impl Value {
                         format!(", {}", x.to_string())
                     ))
                 );
-                s.remove(1);
-                s.remove(1);
                 s
             }
         }

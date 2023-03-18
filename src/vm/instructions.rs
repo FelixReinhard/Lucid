@@ -48,7 +48,9 @@ pub enum Instruction {
     AccessList,
     SetList,
     Dup(usize), // how many stack elements should be copied
-    Struct(usize, Box<HashMap<String, usize>>), // how many values 
+    Struct(Box<HashMap<String, usize>>), // how many values 
+    StructGet(Box<String>),
+    StructSet(Box<String>),
 }
 
 impl Instruction {

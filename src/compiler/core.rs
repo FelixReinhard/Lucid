@@ -1,6 +1,7 @@
 use crate::compiler::error::ErrorHandler;
 use crate::compiler::functions::FunctionTable;
 use crate::compiler::globaltable::GlobalTable;
+use crate::compiler::structs::StructTable;
 use crate::compiler::locals::Locals;
 use crate::compiler::tokenstream::TokenStream;
 use crate::lexer::{Token, TokenData};
@@ -21,6 +22,7 @@ pub struct Compiler {
     pub error_handler: ErrorHandler,
     pub locals: Locals,
     pub functions: FunctionTable,
+    pub structs: StructTable,
 }
 
 impl Compiler {
@@ -36,6 +38,7 @@ impl Compiler {
             error_handler: ErrorHandler::new(),
             locals: Locals::new(),
             functions: FunctionTable::new(),
+            structs: StructTable::new(),
         }
         .define_natives()
     }

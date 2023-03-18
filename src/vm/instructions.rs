@@ -3,6 +3,7 @@ use crate::utils::Value;
 use crate::utils::UpValueList;
 
 use std::rc::Rc;
+use std::collections::HashMap;
 
 
 #[derive(Debug, Clone)]
@@ -47,6 +48,7 @@ pub enum Instruction {
     AccessList,
     SetList,
     Dup(usize), // how many stack elements should be copied
+    Struct(usize, Box<HashMap<String, usize>>), // how many values 
 }
 
 impl Instruction {

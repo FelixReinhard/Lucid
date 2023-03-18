@@ -1,5 +1,10 @@
 fn test() {
   let a = "not";
   fn assign() => a = "assigned";
-  return ret;
 }
+
+struct T{x, y, z}
+
+let x = new T;
+let z = x.x; // null
+let y = new T(3, 2, 1);

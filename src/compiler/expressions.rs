@@ -36,6 +36,7 @@ impl Compiler {
             | TokenData::StringLiteral(_)
             | TokenData::Keyword("null") => self.literal(tokens),
             TokenData::Identifier(_) => self.variable(tokens, precedence <= Precedence::Assign),
+            TokenData::Keyword("new") => self.struct_instance(tokens),
             _ => {
                 self.error_handler.report_error(
                     LangError::ParsingError(
@@ -59,6 +60,27 @@ impl Compiler {
                 TokenData::BrackOpen => self.list_access(tokens, precedence <= Precedence::Assign),
                 _ => self.binary(tokens),
             }
+        }
+    }
+
+    fn struct_instance(&mut self, tokens: &mut TokenStream) {
+        let new = tokens.next().unwrap();
+
+        let struct_name = tokens.consume_identifier(&mut self.error_handler);
+
+        if let Some(s) = self.structs.get(&struct_name) {
+            if tokens.match_token(TokenData::ParenOpen) {
+
+            } else {
+                for _ in 0..s.field_names.len() {
+
+                }
+            }
+        } else {
+            self.error_handler.report_error(
+                LangError::ParsingError(new.line, "Undefined struct"),
+                tokens,
+            );
         }
     }
 
@@ -488,6 +510,7 @@ impl Compiler {
             TokenData::And => Precedence::BitAnd,
             TokenData::ShiftLeft | TokenData::ShiftRight => Precedence::Shift,
             TokenData::Keyword("fn") => Precedence::Lambda,
+            TokenData::Keyword("new") => Precedence::Call,
             _ => Precedence::None,
         }
     }
@@ -510,6 +533,7 @@ pub enum Precedence {
     Power,    // **
     Cast,     // as
     Unary,    // ! -
+    New,      // new Keyword
     Call,     // () .
     Primary,
     Error,
@@ -531,7 +555,8 @@ impl Precedence {
             Precedence::Factor => Precedence::Power,
             Precedence::Power => Precedence::Cast,
             Precedence::Cast => Precedence::Unary,
-            Precedence::Unary => Precedence::Call,
+            Precedence::Unary => Precedence::New,
+            Precedence::New => Precedence::Call,
             Precedence::Call => Precedence::Primary,
             Precedence::Primary => Precedence::Primary,
             _ => Precedence::Error,

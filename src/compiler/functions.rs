@@ -181,6 +181,10 @@ impl FunctionTable {
         
     }
 
+    pub fn is_in_function(&self) -> bool {
+        !self.current.is_empty()
+    }
+    
     pub fn enter_function(&mut self, name: String) {
         self.current.push(name);
     }

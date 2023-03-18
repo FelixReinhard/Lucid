@@ -3,6 +3,7 @@ use crate::compiler::tokenstream::TokenStream;
 use crate::lexing::lexer::{Token, TokenData};
 use crate::utils::LangError;
 use crate::vm::instructions::Instruction;
+use crate::compiler::structs::StructDef;
 
 impl Compiler {
     pub fn declaration(&mut self, tokens: &mut TokenStream) {
@@ -40,7 +41,35 @@ impl Compiler {
     }
 
     fn struct_declaration(&mut self, tokens: &mut TokenStream) {
+        let tk = tokens.next().unwrap();
 
+        // Check if we are on the top level so not in a function declaration 
+        if self.functions.is_in_function() {
+            self.error_handler.report_error(
+                LangError::ParsingError(tk.line ,"Structs can only be created in top level code"),
+                tokens,
+            );
+            return;
+        }
+        // now consume a identifier
+        let identifier = tokens.consume_identifier(&mut self.error_handler);
+        
+        tokens.consume(TokenData::CurlyOpen, &mut self.error_handler);
+
+        let mut struct_fields: Vec<String> = Vec::new();
+
+        while !tokens.check(TokenData::CurlyClose) {
+            // As long as possible consume a identifier and then a comma
+            let ident = tokens.consume_identifier(&mut self.error_handler);
+
+            struct_fields.push(ident);
+
+            if !tokens.match_token(TokenData::Coma) {
+                break;
+            }
+        }
+        tokens.consume(TokenData::CurlyClose, &mut self.error_handler);
+        self.structs.push_definition(identifier, StructDef::new(struct_fields));
     }
 
     fn return_statement(&mut self, tokens: &mut TokenStream) {

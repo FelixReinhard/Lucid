@@ -6,4 +6,5 @@ mod declarations;
 mod expressions;
 mod locals;
 mod native_definitions;
+mod structs;
 pub mod functions;

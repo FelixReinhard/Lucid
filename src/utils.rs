@@ -1,5 +1,6 @@
 use crate::lexing::lexer::TokenData;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug)]
@@ -50,7 +51,7 @@ impl Constant {
 
 #[derive(Debug, Clone)]
 pub enum UpValue {
-    Local(usize), // stack slot
+    Local(usize),     // stack slot
     Recursive(usize), // index of the UpValue one call frame above
 }
 
@@ -70,6 +71,7 @@ pub enum Value {
     Null,
     List(List),
     Shared(SVal),
+    StructInstance(List, Box<HashMap<String, usize>>), // Each instance has a list of its values behind a Rc
 }
 
 impl Value {
@@ -83,7 +85,23 @@ impl Value {
             Self::Str(s) => format!("{}", s),
             Self::Func(name, _, _) => format!("fn: <{}>", name),
             Self::Shared(val) => val.borrow().to_string(),
-
+            Self::StructInstance(ls, map) => {
+                let mut s = format!(
+                    "struct names: ({}), values: ({})",
+                    ls.borrow().iter().fold(String::new(), |acc, x| format!(
+                        "{}{}",
+                        acc,
+                        format!(", {}", x.to_string())
+                    )),
+                    map.iter().fold(String::new(), |acc, (key, value)| format!(
+                        "{}, {}{}",
+                        acc, key, value
+                    )),
+                );
+                s.remove(1);
+                s.remove(1);
+                s
+            }
             Self::List(ls) => {
                 let mut s = format!(
                     "[{}]",
@@ -110,6 +128,23 @@ impl Value {
             Self::Str(s) => format!("Str({})", s),
             Self::Func(name, _, _) => format!("fn: <{}>", name),
             Self::Shared(val) => val.borrow().to_debug(),
+            Self::StructInstance(ls, map) => {
+                let mut s = format!(
+                    "struct names: ({}), values: ({})",
+                    ls.borrow().iter().fold(String::new(), |acc, x| format!(
+                        "{}{}",
+                        acc,
+                        format!(", {}", x.to_string())
+                    )),
+                    map.iter().fold(String::new(), |acc, (key, value)| format!(
+                        "{}, {}{}",
+                        acc, key, value
+                    )),
+                );
+                s.remove(1);
+                s.remove(1);
+                s
+            }
             Self::List(ls) => {
                 let mut s = format!(
                     "[{}]",

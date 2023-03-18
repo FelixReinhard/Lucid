@@ -63,6 +63,10 @@ impl Instruction {
             Instruction::Negate => match operand {
                 Value::Float(v) => Ok(Value::Float(-v)),
                 Value::Integer(v) => Ok(Value::Integer(-v)),
+                Value::Shared(v) => {
+                    println!("here"); // TODO
+                    Err(LangError::None)
+                }
                 _ => Err(LangError::Runtime),
             },
             _ => {

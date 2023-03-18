@@ -1,8 +1,9 @@
-struct Test{x, y, z}
+fn t() {
+  let x = 10;
+  fn r() => x;
+  return r;
+}
 
-let x = new Test(
-  new Test(1, 2, 3), 
-  30, 
-  40);
-x.y = 0;
-print(x.x.x);
+print(-t()());
+
+// TODO shared value support for addition etc.

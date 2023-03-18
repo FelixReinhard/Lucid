@@ -54,9 +54,10 @@ pub enum UpValue {
     Recursive(usize), // index of the UpValue one call frame above
 }
 
-type List = Box<Rc<RefCell<Vec<Value>>>>;
+pub type List = Rc<Box<RefCell<Vec<Value>>>>;
 // A value that is shared between more then one stack object.
-type SVal = Box<Rc<RefCell<Value>>>;
+pub type SVal = Box<Rc<RefCell<Value>>>;
+pub type UpValueList = Box<Rc<RefCell<Vec<UpValue>>>>;
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -64,7 +65,7 @@ pub enum Value {
     Integer(i64),
     Bool(bool),
     Str(Rc<String>),
-    Func(usize, u32),
+    Func(usize, u32, List),
     NativeFunc(usize, u32),
     Null,
     List(List),
@@ -80,7 +81,7 @@ impl Value {
             Self::Bool(b) => format!("{}", b),
             Self::Null => "Null".to_string(),
             Self::Str(s) => format!("{}", s),
-            Self::Func(name, _) => format!("fn: <{}>", name),
+            Self::Func(name, _, _) => format!("fn: <{}>", name),
             Self::Shared(val) => val.borrow().to_string(),
 
             Self::List(ls) => {
@@ -107,7 +108,7 @@ impl Value {
             Self::Bool(b) => format!("Bool({})", b),
             Self::Null => "Null".to_string(),
             Self::Str(s) => format!("Str({})", s),
-            Self::Func(name, _) => format!("fn: <{}>", name),
+            Self::Func(name, _, _) => format!("fn: <{}>", name),
             Self::Shared(val) => val.borrow().to_debug(),
             Self::List(ls) => {
                 let mut s = format!(

@@ -6,6 +6,7 @@ use crate::utils::{Constant, LangError, Value};
 use crate::vm::instructions::Instruction;
 
 use std::rc::Rc;
+use std::cell::RefCell;
 
 impl Compiler {
     pub fn expression(&mut self, tokens: &mut TokenStream) {
@@ -109,7 +110,8 @@ impl Compiler {
         if let Some(function) = self.functions.get_lambda(lambda) {
             self.emit(Instruction::FuncRef(
                 function.adress,
-                function.args_count,
+                function.args_count, 
+                Box::new(Rc::new(RefCell::new(function.upvalues.clone()))),
             ));
         }
 
@@ -397,6 +399,7 @@ impl Compiler {
                     self.emit(Instruction::FuncRef(
                         function.adress,
                         function.args_count,
+                        Box::new(Rc::new(RefCell::new(function.upvalues.clone()))),
                     ));
                 }
                 // First check if this variable is maybe in the locals in a higher call frame 
@@ -414,7 +417,6 @@ impl Compiler {
                 //  fn test2() => x;
                 // }
                 //
-                println!("{:?}", ident);
                 let slot = self.functions.add_up_value(index, call_frame_diff);
 
                 self.variable_operations(

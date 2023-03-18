@@ -44,7 +44,6 @@ impl Compiler {
         while tokens.peek_not_eq(TokenData::EOF) && self.error_handler.can_continue() {
             self.declaration(tokens);
         }
-        self.functions.print_functions();
         if self.error_handler.ok() {
             Some(self.chunk)
         } else {

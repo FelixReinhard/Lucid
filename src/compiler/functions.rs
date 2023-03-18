@@ -74,7 +74,6 @@ impl FunctionTable {
 
     fn get_mut_from_back(&mut self, offset: usize) -> Option<&mut FunctionData> {
         let key_opt;
-        println!("{:?}", self.current);
         if let Some(key) = self.current.get(self.current.len() - offset).clone() {
             key_opt = key.clone();
         } else {
@@ -131,7 +130,6 @@ impl FunctionTable {
     // Then when compiling x in (1) the callframe_distance is 1 as x is not in the callframe of tt
     // but in the callframe of t which is 1 away
     pub fn add_up_value(&mut self, index: usize, mut callframe_distance: u32) -> usize {
-        println!("{}", callframe_distance);
         if callframe_distance == 1 {
             // If the distance is only one we can add the upvalue directly
             // So get the last function, so the function that is currently being compiled and add

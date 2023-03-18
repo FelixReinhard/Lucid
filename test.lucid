@@ -1,11 +1,5 @@
 fn test() {
-  let x = 10;
-  let y = 20;
-  fn printy() {
-    fn t() => y;
-    return t;
-  } 
-  return printy;
+  let a = "not";
+  fn assign() => a = "assigned";
+  return ret;
 }
-
-test();

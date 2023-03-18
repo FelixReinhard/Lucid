@@ -1,4 +1,4 @@
-use crate::utils::{LangError, Value};
+use crate::utils::{LangError, List, SVal, UpValue, UpValueList, Value};
 use crate::vm::chunk::Chunk;
 use crate::vm::instructions::Instruction;
 use crate::vm::native::execute_native_function;
@@ -16,21 +16,25 @@ struct CallFrame {
     return_adress: usize,
     ip_offset: usize,
     args_count: u32,
-    locals_to_pop: u32,
+    up_values: List,
 }
 
 impl CallFrame {
-    fn new(
-        return_adress: usize,
-        ip_offset: usize,
-        args_count: u32,
-        locals_to_pop: u32,
-    ) -> CallFrame {
+    fn new(return_adress: usize, ip_offset: usize, args_count: u32, up_values: List) -> CallFrame {
         CallFrame {
             return_adress,
             ip_offset,
             args_count,
-            locals_to_pop,
+            up_values,
+        }
+    }
+
+    // get the upvalue from the callframe and return a new shared value
+    fn get_up_value(&self, index: usize) -> Option<Value> {
+        if let Some(Value::Shared(v)) = self.up_values.borrow().get(index) {
+            Some(Value::Shared(Box::new(Rc::clone(v))))
+        } else {
+            None
         }
     }
 }
@@ -48,7 +52,12 @@ struct Interpreter {
 impl Interpreter {
     fn new(chunk: Chunk) -> Interpreter {
         let mut call_frames: Vec<CallFrame> = Vec::new();
-        call_frames.push(CallFrame::new(0, 0, 0, 0));
+        call_frames.push(CallFrame::new(
+            0,
+            0,
+            0,
+            Rc::new(Box::new(RefCell::new(Vec::new()))),
+        ));
         Interpreter {
             chunk,
             ip: 0,
@@ -92,6 +101,39 @@ impl Interpreter {
         self.call_frames.last().unwrap().ip_offset + offset
     }
 
+    fn capture_upvalues(&mut self, up_value_definitions: UpValueList) -> Option<List> {
+        let definitions = up_value_definitions.borrow();
+        let mut up_values: Vec<Value> = Vec::new();
+        for def in definitions.iter() {
+            match def {
+                UpValue::Local(local_index) => {
+                    // In this case the value that should be captured is a local variable so we
+                    // resolve it the same way
+                    let pointer = self.get_absolute_pointer(*local_index);
+                    if self.stack.len() <= pointer {
+                        return None;
+                    }
+                    // now replace the Value at that slot by a Shared Value
+                    let value = Rc::new(RefCell::new(self.stack.remove(pointer)));
+                    self.stack
+                        .insert(pointer, Value::Shared(Box::new(Rc::clone(&value))));
+
+                    up_values.push(Value::Shared(Box::new(Rc::clone(&value))));
+                }
+                UpValue::Recursive(call_frame_value) => {
+                    // In this case we refer to an upvalue of the call_frame
+                    let frame = self.call_frames.last().unwrap();
+                    if let Some(v) = frame.get_up_value(*call_frame_value) {
+                        up_values.push(v);
+                    } else {
+                        return None;
+                    }
+                }
+            }
+        }
+        Some(Rc::new(Box::new(RefCell::new(up_values))))
+    }
+
     fn run(&mut self, print_stack: bool) -> Result<Value, LangError> {
         loop {
             if self.ip >= self.chunk.code.len() {
@@ -104,7 +146,10 @@ impl Interpreter {
                 println!(
                     "IP: {}, STACK: [{}]",
                     self.ip - 1,
-                    self.stack.iter().map(|v| format!("{}, ", v.to_debug())).collect::<String>()
+                    self.stack
+                        .iter()
+                        .map(|v| format!("{}, ", v.to_debug()))
+                        .collect::<String>()
                 );
             }
             match instruction {
@@ -182,7 +227,7 @@ impl Interpreter {
                         return Err(LangError::RuntimeMessage("Perhaps you forgot a return"));
                     }
 
-                    if let Value::Func(adress, args_count) =
+                    if let Value::Func(adress, args_count, up_vals) =
                         &self.stack[self.stack.len() - 1 - args]
                     {
                         if args_given != *args_count {
@@ -195,7 +240,7 @@ impl Interpreter {
                             self.ip + 1,
                             self.stack.len() - args,
                             *args_count,
-                            0,
+                            Rc::clone(up_vals),
                         ));
                         self.ip = *adress;
                     } else if let Value::NativeFunc(id, _args_count) =
@@ -223,28 +268,26 @@ impl Interpreter {
                         return Err(LangError::RuntimeMessage("Cannot call none function type"));
                     }
                 }
-                // Push the value of the function onto the stack if followed by a CallFunc we pop
-                // this value and execute it.
-                // Upvalues
-                // Consider this program
-                //
-                // fn outer() {
-                //  let x = 10;
-                //  fn inner() return x;
-                //  return inner; (1)
-                // }
-                //
-                // let res = outer()();
-                //
-                // res should be 10.
-                // To capture the x we must at (1) know that the function inner captures the local
-                // variable x, So at (1) we copy x to the actuall Value::Func object and save it
-                // there, then when calling it we add this value to the up_values of the call
-                // frame. When inside the call of inner() instead of GetLocal we do GetUpvalue
-                // which looks inside the call frame and returns the 0th upvalues. As it is know at
-                // compile time which index the upvalue has compiling this is not a problem.
-                Instruction::FuncRef(adress, args_count) => {
-                    self.push(Value::Func(adress, args_count));
+                Instruction::GetUpvalue(index) => {
+                    let val = self.call_frames.last().unwrap().up_values.borrow()[index].clone();
+                    self.push(val);
+                }
+                Instruction::SetUpvalue(index) => {
+                    if let Some(val) = self.peek() {
+                        let ref mut upvalue = *self.call_frames.last().unwrap().up_values.borrow_mut();
+                        if let Value::Shared(ref mut old) = upvalue[index] {
+                            old.replace_with(|&mut _| val);
+                        } 
+                    } else {
+                        return Err(LangError::RuntimeMessage("Cannot set Upvalue, no value there"));
+                    }
+                }
+                Instruction::FuncRef(adress, args_count, up_value_definitions) => {
+                    if let Some(captured_values) = self.capture_upvalues(up_value_definitions) {
+                        self.push(Value::Func(adress, args_count, captured_values));
+                    } else {
+                        return Err(LangError::RuntimeMessage("Funcref coulndt get upvals"));
+                    }
                 }
                 Instruction::NativeRef(id, args_count) => {
                     self.push(Value::NativeFunc(id, args_count));
@@ -309,7 +352,7 @@ impl Interpreter {
                         }
                     }
                     ls.reverse();
-                    self.push(Value::List(Box::new(Rc::new(RefCell::new(ls)))));
+                    self.push(Value::List(Rc::new(Box::new(RefCell::new(ls)))));
                 }
                 Instruction::SetList => {
                     // let new_val = self.pop();

@@ -40,6 +40,7 @@ impl Locals {
         self.locals.push(Local {
             name,
             scope_depth: self.scope_depth,
+            callframe_depth: self.local_call_fame_offsets.len() as u32,
         });
     }
 
@@ -49,12 +50,10 @@ impl Locals {
                 if self.local_call_fame_offsets.is_empty() {
                     return Some(i);
                 }
-                return match self
-                    .local_call_fame_offsets.last()
-                {
+                return match self.local_call_fame_offsets.last() {
                     Some(offset) => {
                         if *offset > i {
-                            // This means the local is a upvalue as it is not in 
+                            // This means the local is a upvalue as it is not in
                             // the callframe.
                             None
                         } else {
@@ -67,20 +66,26 @@ impl Locals {
         }
         None
     }
-
-    pub fn get_upvalue(&self, name: &String) -> Option<usize> {
+    // Checks if the variable with name can be found in a callframe
+    pub fn get_upvalue(&self, name: &String) -> Option<(usize, u32)> {
         for (i, local) in self.locals.iter().enumerate() {
             if name == &local.name {
-                return Some(i);
+                let call_frame_offset =
+                    self.local_call_fame_offsets[local.callframe_depth as usize - 1];
+                return Some((
+                    i - call_frame_offset, // i is the real place on the stack, call_frame_offset
+                    // is the offset that is calculated at runtime to get the real pointer into the
+                    // stack
+                    self.local_call_fame_offsets.len() as u32 - local.callframe_depth, // this
+                    // tells us how many call frames we would have to go up to find this variable
+                ));
             }
         }
         None
     }
 
-    pub fn new_function(&mut self, ) {
-        if !self.locals.is_empty() {
-            self.local_call_fame_offsets.push(self.locals.len());
-        }
+    pub fn new_function(&mut self) {
+        self.local_call_fame_offsets.push(self.locals.len());
     }
     pub fn end_function(&mut self) {
         if !self.local_call_fame_offsets.is_empty() {
@@ -92,5 +97,23 @@ impl Locals {
 pub struct Local {
     name: String,
     scope_depth: u32,
+    // this represents in which callframe_depth the local was declared
+    // for example
+    //
+    // fn test() {
+    //  let x = 10;
+    //  {
+    //  let y = 20;
+    //  }
+    //  fn test2() {
+    //      let z = 30;
+    //      y ++; // callframe_depth = 2
+    //  }
+    // }
+    // x has callframe_depth 1 as it is declared inside a function,
+    // y has callframe_depth 1 but a different scope_depth
+    // z has callframe_depth 2 as it is declared one function declaration deeper.
+    //
+    callframe_depth: u32,
     // type: TypeInformation // if adding type checking
 }

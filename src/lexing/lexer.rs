@@ -146,7 +146,7 @@ impl Lexer {
             chars: code.chars().collect(),
             tokens: VecDeque::new(),
             had_error: false,
-            line: 0,
+            line: 1,
         }
     }
 

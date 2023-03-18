@@ -1,0 +1,52 @@
+Consider this programm 
+fn outer() {
+  let var_out = "outer";
+  fn middle() {
+    let var_mid = "middle";
+    fn inner() => var_out + var_mid + "inner";
+    return inner;
+  }
+  return middle;
+}
+
+let res = outer()()();
+
+This should then output "outermiddleinner", but both 'var_out' and 'var_mid' will be popped off the stack 
+when middle is called. So we need to know at compile time that the function middle wants to get var_out and take it with it.
+
+When we compile inner() in the block we first get a variable var_out. Here as we are in a callframe of inner() we dont get 
+the local var_mid from the get_local call in 'variable'. So now the compiler notices that this variable must be captured.
+So instead of getLocal we do a getUpvalue Instruction. We add into the functionData of inner that the first Upvalue 
+it captures is the local 'var_mid'. This is a 'addUpvalueCall' that takes the stack slot in the scope of middle, in this case 0
+It returns 0, as this is the first Upvalue inner_captures. 
+Now we need to capture 'var_mid'. We again notice that this is not a variable in the callframe of inner, so therefore it must be 
+an Upvalue. Again we call addUpvalue. Inside the function sees that var_out is also not in the callframe of middle. The in recursivly
+adds Upvalues(is_local=false) to the functions, so at the end we have the following.
+
+fn middle: Upvalue 0 points to var_out(0 on stack callframe),
+fn inner: Upvalue 0 points to var_mid(0 on stack callframe), Upvalue 1 points to Upvalue 0 of middle.
+
+Runtime: 
+Now when executing a outer()()() we first get the function outer. This FunctionData does not have any Upvalues so we proceed with calling it normally.
+Then inside outer we declar var_out, and want to return middle. We then get the FunctionData for middle and see that it 
+captures var_out, which lies on the stack at 0 seen from the current callframe. So before returning the FuncRef Value,
+we first capture var_out, by replacing it on the Stack With a Value::Captured(Rc<Value>), and get another Rc instance of this object
+and put it into the Upvalue list of the FuncRef Value. Then we put this FuncRef Value onto the stack and are done.
+Now when we call this FuncRef object which is middle call, we first pop off all captured values (Value::Captured) from the 
+list contained in FuncRef and add those references to the callframe, It now is not important that the value has been poped away, 
+because it only poped a shared value with a Rc, so the value is still valid. It now lies into the Callframe.
+So we enter middle: Here we declare var_mid and try to return inner. The FuncRef Instruction then tells the runtime 
+that it wants to capture two values: first the var_mid is done the same as before, replacing it on the stack with a 
+Shared value and adding a Copy of the Shared to the Func Value, then for the second one instead of looking on the stack,
+we look up in the callframes, so we need how many callframes up the upvalue is and which index it has. So we arrive
+at an upvalue previously captured, we then capture it again by getting another shared Rc of this value and add it to the FuncValue
+Finnally when we call inner with a FuncRef that has two Upvalues that were both captured previously,
+we have getUpvalue Instructions and can therefore look inside the callframe we are in and get 
+the Shared Values by their index
+If we want to set this value it is also possible as all Value::Shared point to the same actuall value. Thanks to Rust there 
+is no need for GC.
+
+enum Upvalue {
+  Immidiate(index),
+  Recursive(index),
+}

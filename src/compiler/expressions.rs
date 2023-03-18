@@ -1,5 +1,5 @@
 use crate::compiler::core::Compiler;
-use crate::compiler::functions::{FunctionData, UpValue};
+use crate::compiler::functions::{FunctionData};
 use crate::compiler::tokenstream::TokenStream;
 use crate::lexing::lexer::TokenData;
 use crate::utils::{Constant, LangError, Value};
@@ -82,7 +82,7 @@ impl Compiler {
             .functions
             .put_lambda(jump_over_function_code + 1, arg_amount);
         if tokens.check(TokenData::Arrow) {
-            self.arrow_block(tokens, true);
+            self.arrow_block_fn(tokens);
         } else if tokens.check(TokenData::CurlyOpen) {
             self.block(tokens);
         } else {
@@ -110,7 +110,6 @@ impl Compiler {
             self.emit(Instruction::FuncRef(
                 function.adress,
                 function.args_count,
-                Box::new(Rc::clone(&function.upvalues)),
             ));
         }
 
@@ -390,33 +389,41 @@ impl Compiler {
                 } else {
                     // a function also takes a Heap allocated list of upvalues stored in the
                     // function itself.
+                    // So As we have a list of upvalues we copy them into this funcref when the
+                    // instruction is executed it will copy the corresponding variables from the
+                    // stack into the Value::Func that gets put onto the stack
+                    //
+                    // let upvalues = function.upvalues.clone();
                     self.emit(Instruction::FuncRef(
                         function.adress,
                         function.args_count,
-                        Box::new(Rc::clone(&function.upvalues)),
                     ));
                 }
-            } else if let Some(upval) = self.locals.get_upvalue(&ident) {
-                // we encountered a variable that is captured, so now we need to tell the current
-                // function we are inside of that it needs to capture this variable, to do so we
-                // simply do
-                if let Some(index) = self.functions.add_upvalue(UpValue {
-                    index: upval,
-                    is_local: false,
-                }) {
-                    self.variable_operations(
-                        tokens,
-                        can_assign,
-                        Instruction::GetUpvalue(index),
-                        Instruction::SetUpvalue(index),
-                        identifier.line,
-                    );
-                } else {
-                    self.error_handler.report_error(
-                        LangError::ParsingError(identifier.line, "variable: upvalue problem"),
-                        tokens,
-                    );
-                }
+                // First check if this variable is maybe in the locals in a higher call frame 
+                // if yes then it returns the place on the stack of the variable in relation 
+                // to the callframe and the amount of call frames one needs to go up 
+            } else if let Some((index, call_frame_diff)) = self.locals.get_upvalue(&ident) {
+                // Here we have the index in relation to the callframe that is located
+                // call_frame_diff above the current callframe. 
+
+                // now if call_frame_diff is 1 then that means we capture a variable that is a
+                // local in the current call_frame for example 
+                // 
+                // fn test() {
+                //  let x = 10;
+                //  fn test2() => x;
+                // }
+                //
+                println!("{:?}", ident);
+                let slot = self.functions.add_up_value(index, call_frame_diff);
+
+                self.variable_operations(
+                    tokens,
+                    can_assign,
+                    Instruction::GetUpvalue(slot),
+                    Instruction::SetUpvalue(slot),
+                    identifier.line,
+                );
             } else {
                 self.error_handler.report_error(
                     LangError::ParsingError(identifier.line, "variable: Undefined variable!."),

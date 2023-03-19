@@ -2,7 +2,7 @@
 
 An interpreted dynamically typed imperative programming Language written in Rust. It uses a stack-based virtual machine with a single pass compiler.
 
-Most of the code was written while reading the book [crafting interpreters](craftinginterpreters.com/).
+Most of the code was written while reading the book [crafting interpreters](https://craftinginterpreters.com/).
 
 ## Installation 
 You can install the interpreter by building it from source. To do that, you need the [rust tool chain](https://www.rust-lang.org/tools/install). 

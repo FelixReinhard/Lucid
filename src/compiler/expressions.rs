@@ -610,7 +610,7 @@ impl Compiler {
     fn grouping(&mut self, tokens: &mut TokenStream) {
         tokens.next();
         self.expression(tokens);
-        tokens.consume(TokenData::Semicol, &mut self.error_handler);
+        tokens.consume(TokenData::ParenClose, &mut self.error_handler);
     }
 
     fn get_precedence(token: &TokenData) -> Precedence {

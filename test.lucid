@@ -1,5 +1,7 @@
+let n = now();
 {
-  for i in range(20) => 
+  for i in range(2000) => 
     print(i);
 
 }
+print("elapsed: " + (now() - n));

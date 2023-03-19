@@ -160,6 +160,8 @@ impl Instruction {
                 (Value::Integer(l), Value::Float(r)) => Ok(Value::Float(l as f64 + r)),
                 (Value::Float(l), Value::Integer(r)) => Ok(Value::Float(l + r as f64)),
                 (Value::Str(s1), Value::Str(s2)) => Ok(Value::Str(Rc::new(format!("{}{}", *s1, *s2)))), 
+                (Value::Str(s), Value::Integer(i)) => Ok(Value::Str(Rc::new(format!("{}{}", *s, i)))),
+                (Value::Integer(i), Value::Str(s)) => Ok(Value::Str(Rc::new(format!("{}{}", i, *s)))),
                 _ => Err(LangError::Runtime),
             },
             Instruction::Sub => match (left, right) {

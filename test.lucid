@@ -1,3 +1,2 @@
-struct Vec2{x, y}
-
-let x = new Vec2(20, 30);
+import imported;
+imported_fn();

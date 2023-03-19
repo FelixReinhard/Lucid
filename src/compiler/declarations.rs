@@ -1,9 +1,9 @@
 use crate::compiler::core::Compiler;
+use crate::compiler::structs::StructDef;
 use crate::compiler::tokenstream::TokenStream;
 use crate::lexing::lexer::{Token, TokenData};
 use crate::utils::LangError;
 use crate::vm::instructions::Instruction;
-use crate::compiler::structs::StructDef;
 
 impl Compiler {
     pub fn declaration(&mut self, tokens: &mut TokenStream) {
@@ -22,12 +22,6 @@ impl Compiler {
             return;
         }
         match peeked.tk {
-            TokenData::DEBUG => {
-                tokens.next();
-                self.expression(tokens);
-                tokens.consume(TokenData::Semicol, &mut self.error_handler);
-                self.emit(Instruction::DEBUG);
-            }
             TokenData::Keyword("let") => self.var_declaration(tokens),
             TokenData::Keyword("struct") => self.struct_declaration(tokens),
             TokenData::Keyword("fn") => self.function(tokens),
@@ -36,6 +30,9 @@ impl Compiler {
             TokenData::Keyword("if") => self.if_statement(tokens),
             TokenData::Keyword("while") => self.while_statement(tokens),
             TokenData::Keyword("return") => self.return_statement(tokens),
+            TokenData::Semicol => {
+                tokens.next();
+            }
             _ => self.expression_statement(tokens),
         }
     }
@@ -43,17 +40,17 @@ impl Compiler {
     fn struct_declaration(&mut self, tokens: &mut TokenStream) {
         let tk = tokens.next().unwrap();
 
-        // Check if we are on the top level so not in a function declaration 
+        // Check if we are on the top level so not in a function declaration
         if self.functions.is_in_function() {
             self.error_handler.report_error(
-                LangError::ParsingError(tk.line ,"Structs can only be created in top level code"),
+                LangError::ParsingError(tk.line, "Structs can only be created in top level code"),
                 tokens,
             );
             return;
         }
         // now consume a identifier
         let identifier = tokens.consume_identifier(&mut self.error_handler);
-        
+
         tokens.consume(TokenData::CurlyOpen, &mut self.error_handler);
 
         let mut struct_fields: Vec<String> = Vec::new();
@@ -69,12 +66,12 @@ impl Compiler {
             }
         }
         tokens.consume(TokenData::CurlyClose, &mut self.error_handler);
-        self.structs.push_definition(identifier, StructDef::new(struct_fields));
+        self.structs
+            .push_definition(identifier, StructDef::new(struct_fields));
     }
 
     fn return_statement(&mut self, tokens: &mut TokenStream) {
         let _ = tokens.next().unwrap();
-        
 
         if tokens.match_token(TokenData::Semicol) {
             // return null;
@@ -86,7 +83,6 @@ impl Compiler {
         }
         self.emit(Instruction::Return);
     }
-
 
     fn function(&mut self, tokens: &mut TokenStream) {
         let fn_ = tokens.next().unwrap();
@@ -116,28 +112,37 @@ impl Compiler {
                 if tokens.check(TokenData::Coma) {
                     tokens.next();
                 }
-                false 
-            },
-            false => true 
+                false
+            }
+            false => true,
         };
 
         let arg_amount = self.function_parameters(tokens);
 
         tokens.consume(TokenData::ParenClose, &mut self.error_handler);
-    
-        self.functions
-            .put(function_name.clone(), jump_over_function_code + 1, arg_amount, is_method, is_static);
+
+        self.functions.put(
+            function_name.clone(),
+            jump_over_function_code + 1,
+            arg_amount,
+            is_method,
+            is_static,
+        );
         if is_method && !is_static {
             self.emit(Instruction::DefineSelf(arg_amount as usize + 1));
         }
         if is_method {
-            if !self.structs.push_method(&struct_name, self.functions.get(&function_name).unwrap().clone(), function_name.clone()) {
+            if !self.structs.push_method(
+                &struct_name,
+                self.functions.get(&function_name).unwrap().clone(),
+                function_name.clone(),
+            ) {
                 self.error_handler.report_error(
-                    LangError::ParsingError(fn_.line ,"Struct does not exist."),
+                    LangError::ParsingError(fn_.line, "Struct does not exist."),
                     tokens,
                 );
                 return;
-            } 
+            }
         }
 
         if tokens.check(TokenData::Arrow) {
@@ -156,10 +161,10 @@ impl Compiler {
             return;
         }
         // Pop of all arguments and the funcref
-        for _ in 0..arg_amount+1 {
+        for _ in 0..arg_amount + 1 {
             self.emit(Instruction::Pop);
         }
-        // Pop self if there 
+        // Pop self if there
         if is_method && !is_static {
             self.emit(Instruction::Pop);
         }
@@ -295,7 +300,10 @@ impl Compiler {
         self.begin_scope();
         tokens.next();
 
-        while !tokens.check(TokenData::CurlyClose) && !tokens.check(TokenData::EOF) &&!tokens.tokens.is_empty() {
+        while !tokens.check(TokenData::CurlyClose)
+            && !tokens.check(TokenData::EOF)
+            && !tokens.tokens.is_empty()
+        {
             self.declaration(tokens);
         }
 

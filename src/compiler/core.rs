@@ -23,6 +23,7 @@ pub struct Compiler {
     pub locals: Locals,
     pub functions: FunctionTable,
     pub structs: StructTable,
+    pub for_loop_count: u32,
 }
 
 impl Compiler {
@@ -39,6 +40,7 @@ impl Compiler {
             locals: Locals::new(),
             functions: FunctionTable::new(),
             structs: StructTable::new(),
+            for_loop_count: 0,
         }
         .define_natives()
     }

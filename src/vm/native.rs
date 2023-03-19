@@ -1,13 +1,30 @@
 // All native functions
 use crate::utils::Value;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::boxed::Box;
 
 pub fn execute_native_function(id: usize, args: Vec<Value>) -> Option<Value> {
     match id {
         0 => native_println(args),
         1 => native_input(args),
         2 => native_len(args),
+        3 => native_range(args),
         _ => None,
     }
+}
+// Rc<Box<RefCell<Vec<Value>>>>;
+fn native_range(args: Vec<Value>) -> Option<Value> {
+    if args.len() == 1 {
+        if let Value::Integer(x) = args[0] {
+            return Some(Value::List(
+                Rc::new(Box::new(RefCell::new(
+                    (0..x).map(|i| Value::Integer(i)).collect()
+                )))
+            ));
+        }
+    }
+    None
 }
 
 fn native_len(args: Vec<Value>) -> Option<Value> {

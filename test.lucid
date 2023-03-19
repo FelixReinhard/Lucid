@@ -1,2 +1,5 @@
-import imported;
-imported_fn();
+{
+  for i in range(20) => 
+    print(i);
+
+}

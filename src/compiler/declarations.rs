@@ -29,12 +29,161 @@ impl Compiler {
             TokenData::Arrow => self.arrow_block(tokens),
             TokenData::Keyword("if") => self.if_statement(tokens),
             TokenData::Keyword("while") => self.while_statement(tokens),
+            TokenData::Keyword("for") => self.for_statement(tokens),
             TokenData::Keyword("return") => self.return_statement(tokens),
             TokenData::Semicol => {
                 tokens.next();
             }
             _ => self.expression_statement(tokens),
         }
+    }
+    // Consider for i in x 
+    fn for_statement(&mut self, tokens: &mut TokenStream) {
+        self.begin_scope();
+        let for_ = tokens.next().unwrap();
+        // Get the variable name for i in x {print(i);}
+        let i = tokens.consume_identifier(&mut self.error_handler);
+        // create the loop var as a variable and set it to null.
+        // In each iteration before the block executes it will be set to the next element of the
+        // list
+        self.emit(Instruction::Constant(2)); // emit null 
+        if self.locals.is_global_scope() {
+            let var_pointer = self.globals.put(i.clone());
+            self.emit(Instruction::DefGlobal(var_pointer));
+        } else {
+            self.locals.add_local(i.clone());
+        }
+
+        tokens.consume(TokenData::Keyword("in"), &mut self.error_handler);
+
+        // create a variable for the expression, it should be a list
+        // and save it in "0f", as the name starts with a number it cannot be created by 
+        // the programmer.
+        self.expression(tokens);
+        let x = format!("{}f", self.for_loop_count);
+        if self.locals.is_global_scope() {
+            let var_pointer = self.globals.put(x.clone());
+            self.emit(Instruction::DefGlobal(var_pointer));
+        } else {
+            self.locals.add_local(x.clone());
+        }
+
+        // finally create the index variable. and init it to 0,
+        let index_var_name = format!("{}if", self.for_loop_count);
+        let zero = self.push_constant(crate::utils::Constant::Integer(0));
+        self.emit(Instruction::Constant(zero));
+        if self.locals.is_global_scope() {
+            let var_pointer = self.globals.put(index_var_name.clone());
+            self.emit(Instruction::DefGlobal(var_pointer));
+        } else {
+            self.locals.add_local(index_var_name.clone());
+        }
+
+        let loop_start = self.get_instructions_count();
+
+        // here check if {}if < len({}f)
+        // Get {}if
+        if self.locals.is_global_scope() {
+            let slot = self.globals.get(&index_var_name).unwrap();
+            self.emit(Instruction::GetGlobal(slot));
+        } else {
+            let slot = self.locals.get_local(&index_var_name).unwrap();
+            self.emit(Instruction::GetLocal(slot));
+        }
+
+        // Now Get len({}f)
+        self.emit(Instruction::NativeRef(2, 1)); // len native function
+        if self.locals.is_global_scope() {
+            let slot = self.globals.get(&x).unwrap();
+            self.emit(Instruction::GetGlobal(slot));
+        } else {
+            let slot = self.locals.get_local(&x).unwrap();
+            self.emit(Instruction::GetLocal(slot));
+        }
+        self.emit(Instruction::CallFunc(1)); // call native func with 1 argument
+        self.emit(Instruction::Less);
+
+        let jump_exit = self.emit_get(Instruction::Dummy);
+        self.emit(Instruction::Pop);
+
+
+        // set the loop var to the current index,
+        // loopvar = {}f[{}if]
+        // first get {}f 
+        if self.locals.is_global_scope() {
+            let slot = self.globals.get(&x).unwrap();
+            self.emit(Instruction::GetGlobal(slot));
+        } else {
+            let slot = self.locals.get_local(&x).unwrap();
+            self.emit(Instruction::GetLocal(slot));
+        }
+        // now get the index 
+        if self.locals.is_global_scope() {
+            let slot = self.globals.get(&index_var_name).unwrap();
+            self.emit(Instruction::GetGlobal(slot));
+        } else {
+            let slot = self.locals.get_local(&index_var_name).unwrap();
+            self.emit(Instruction::GetLocal(slot));
+        }
+        // access the list.
+        self.emit(Instruction::AccessList);
+        // now set the loopvar 
+        if self.locals.is_global_scope() {
+            let slot = self.globals.get(&i).unwrap();
+            self.emit(Instruction::SetGlobal(slot));
+        } else {
+            let slot = self.locals.get_local(&i).unwrap();
+            self.emit(Instruction::SetLocal(slot));
+            self.emit(Instruction::Pop);
+        }
+        self.for_loop_count += 1;
+
+        // Block
+        if tokens.check(TokenData::Arrow) {
+            self.arrow_block(tokens);
+        } else if tokens.check(TokenData::CurlyOpen) {
+            self.block(tokens);
+        } else {
+            self.error_handler.report_error(
+                LangError::ParsingError(
+                    for_.line,
+                    "Wrong token after while statement. Expected '{' or '=>'!",
+                ),
+                tokens,
+            );
+            return;
+        }
+        
+        // increase index value {}if 
+        // first get the var
+        if self.locals.is_global_scope() {
+            let slot = self.globals.get(&index_var_name).unwrap();
+            self.emit(Instruction::GetGlobal(slot));
+        } else {
+            let slot = self.locals.get_local(&index_var_name).unwrap();
+            self.emit(Instruction::GetLocal(slot));
+        }
+        let c = self.push_constant(crate::utils::Constant::Integer(1));
+        self.emit(Instruction::Constant(c));
+        self.emit(Instruction::Add);
+
+        if self.locals.is_global_scope() {
+            let slot = self.globals.get(&index_var_name).unwrap();
+            self.emit(Instruction::SetGlobal(slot));
+        } else {
+            let slot = self.locals.get_local(&index_var_name).unwrap();
+            self.emit(Instruction::SetLocal(slot));
+            self.emit(Instruction::Pop);
+        }
+        // pop the resulting variable away from the stack.
+        self.emit(Instruction::JumpTo(loop_start + 1));
+        self.patch_jump(
+            jump_exit,
+            Instruction::JumpIfFalse(self.get_instructions_count() - jump_exit),
+        );
+        self.emit(Instruction::Pop);
+        self.for_loop_count -= 1;
+        self.end_scope();
     }
 
     fn struct_declaration(&mut self, tokens: &mut TokenStream) {

@@ -527,6 +527,8 @@ impl Lexer {
             "or" => self.push(TokenData::LogicalOr),
             "and" => self.push(TokenData::LogicalAnd),
             "null" => kw!(self, "null"),
+            "for" => kw!(self, "for"),
+            "in" => kw!(self, "in"),
             "import" => {
                 let mut file = String::new();
 
@@ -546,10 +548,12 @@ impl Lexer {
                     self.next();
                 }
                 file.push_str(".lucid");
-                if let Ok(imported_file_tokens) = lex_file(&file) {
-                    self.push_list(imported_file_tokens, file);
-                } else {
-                    self.error("Couldnt lex other file");
+                if !self.filenames.contains(&file) {
+                    if let Ok(imported_file_tokens) = lex_file(&file) {
+                        self.push_list(imported_file_tokens, file);
+                    } else {
+                        self.error("Couldnt lex other file");
+                    }
                 }
             }
             _ => self.push(TokenData::Identifier(ident)),

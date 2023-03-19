@@ -14,24 +14,15 @@ fn List::push_back_range(self, elements) {
   }
 }
 
-fn List::last(self) {
-  if len(self.ls) > 0 {
-    return self.ls[len(self.ls) - 1];
-  }
-  return null;
-}
+fn List::last(self) => self.ls[len(self.ls) - 1];
+
 fn List::push_front(self, elem) {
-  if len(self.ls) == 0 {
-    push(self.ls, elem);
-    return;
-  }
   let last = self.last();
   let i = len(self.ls) - 2;
-  while i >= 1 {
+  while i >= {
     self.ls[i] = self.ls[i-1];
     i--;
   }
-  self.ls[0] = elem;
   push(self.ls, last);
 }
 
@@ -65,7 +56,3 @@ fn List::fold(self, start_val, func) {
 
 // create methods always at the very end.
 fn List::create() => new List([]);
-let x = List.create();
-x.push_front(100);
-print(x.to_str());
-print(null != null);

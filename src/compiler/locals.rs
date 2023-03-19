@@ -37,7 +37,6 @@ impl Locals {
     }
 
     pub fn add_local(&mut self, name: String) {
-        println!("{:?}", name);
         self.locals.push(Local {
             name,
             scope_depth: self.scope_depth,

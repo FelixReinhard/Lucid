@@ -384,6 +384,10 @@ impl Compiler {
             TokenData::Less => self.emit(Instruction::Less),
             TokenData::Greater => self.emit(Instruction::Greater),
             TokenData::Eq => self.emit(Instruction::Equal),
+            TokenData::Neq => {
+                self.emit(Instruction::Equal);
+                self.emit(Instruction::Not);
+            }
             TokenData::Geq => {
                 self.emit(Instruction::Less);
                 self.emit(Instruction::Not);

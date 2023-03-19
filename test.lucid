@@ -1,10 +1,21 @@
-struct Vec2{x, y}
+struct List{ls}
 
-// normal method 
-fn Vec2::get_x(self) => self.x;
-// static method
-fn Vec2::create() => new Vec2(0, 0);
+fn List::add(self, elem) => push(self.ls, elem);
+fn List::get(self) => self.ls;
+fn List::rev(self) {
+  let new_ls = [];
+  for i in self.ls {
+    push(new_ls, i);
+  }
+  return new List(new_ls);
+}
 
-let vec = Vec2.create();
-let x = vec.get_x();
-print(x);
+// create methods always at the very end.
+fn List::create() => new List([]);
+
+
+let x = List.create();
+for i in range(10) {
+  x.add(i);
+}
+print(x.rev());

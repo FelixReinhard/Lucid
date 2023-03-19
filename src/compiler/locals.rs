@@ -37,6 +37,7 @@ impl Locals {
     }
 
     pub fn add_local(&mut self, name: String) {
+        println!("{:?}", name);
         self.locals.push(Local {
             name,
             scope_depth: self.scope_depth,
@@ -89,7 +90,10 @@ impl Locals {
     }
     pub fn end_function(&mut self) {
         if !self.local_call_fame_offsets.is_empty() {
-            self.local_call_fame_offsets.pop();
+            let desired_stack_height = self.local_call_fame_offsets.pop().unwrap();
+            while self.locals.len() > desired_stack_height {
+                self.locals.pop();
+            }
         }
     }
 }

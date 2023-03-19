@@ -5,6 +5,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::{thread, time};
 use std::time::SystemTime;
+use std::fs;
+use std::path::Path;
 
 pub fn execute_native_function(id: usize, args: Vec<Value>) -> Option<Value> {
     match id {
@@ -14,8 +16,30 @@ pub fn execute_native_function(id: usize, args: Vec<Value>) -> Option<Value> {
         3 => native_range(args),
         4 => native_sleep(args),
         5 => native_now(args),
+        6 => native_read_file(args),
+        7 => native_push(args),
         _ => None,
     }
+}
+
+fn native_push(args: Vec<Value>) -> Option<Value> {
+    if let Some(Value::List(ls)) = args.get(1) {
+        if let Some(val) = args.get(0) {
+            let mut ls_borrow = ls.borrow_mut();
+            ls_borrow.push(val.clone());
+            return Some(Value::Null);
+        }
+    }
+    None
+}
+
+fn native_read_file(args: Vec<Value>) -> Option<Value> {
+    if let Some(Value::Str(path)) = args.get(0) {
+        if let Ok(s) = fs::read_to_string(format!("{}", path)) {
+            return Some(Value::Str(Rc::new(s)));
+        }
+    } 
+    Some(Value::Null)
 }
 
 fn native_now(_args: Vec<Value>) -> Option<Value> {

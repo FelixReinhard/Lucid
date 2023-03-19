@@ -15,6 +15,8 @@ impl Compiler {
         def!(self, "range", 3, 1);
         def!(self, "sleep", 4, 1);
         def!(self, "now", 5, 0);
+        def!(self, "read_file", 6, 0);
+        def!(self, "push", 7, 2);
         self
     }
 }

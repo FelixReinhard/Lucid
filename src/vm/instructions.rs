@@ -51,10 +51,15 @@ pub enum Instruction {
     Struct(Box<HashMap<String, usize>>), // how many values 
     StructGet(Box<String>),
     StructSet(Box<String>),
+    DefineSelf(usize),
+    GetSelf,
 }
 
 impl Instruction {
     pub fn unary_op(&self, operand: Value) -> Result<Value, LangError> {
+        if let Value::Shared(val) = operand {
+            return self.unary_op((*val.borrow()).clone());
+        }
         match self {
             Instruction::Not => match operand {
                 Value::Bool(v) => Ok(Value::Bool(!v)),
@@ -63,10 +68,6 @@ impl Instruction {
             Instruction::Negate => match operand {
                 Value::Float(v) => Ok(Value::Float(-v)),
                 Value::Integer(v) => Ok(Value::Integer(-v)),
-                Value::Shared(v) => {
-                    println!("here"); // TODO
-                    Err(LangError::None)
-                }
                 _ => Err(LangError::Runtime),
             },
             _ => {
@@ -76,7 +77,15 @@ impl Instruction {
         }
     }
 
-    pub fn binary_op(&self, left: Value, right: Value) -> Result<Value, LangError> {
+    pub fn binary_op(&self, mut left: Value, mut right: Value) -> Result<Value, LangError> {
+        while let Value::Shared(val) = left {
+            left = (*val.borrow()).clone();
+        }
+
+        while let Value::Shared(val) = right {
+            right = (*val.borrow()).clone();
+        }
+
         match self {
             Instruction::BitAnd => match (left, right) {
                 (Value::Integer(l), Value::Integer(r)) => Ok(Value::Integer(l & r)),

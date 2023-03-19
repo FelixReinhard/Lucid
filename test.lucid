@@ -1,9 +1,11 @@
-fn t() {
-  let x = 10;
-  fn r() => x;
-  return r;
+struct Vec2{x, y}
+fn Vec2::st() => print("static");
+
+fn Vec2::swap(self) {
+  print(self.x);
+  return self;
 }
-
-print(-t()());
-
-// TODO shared value support for addition etc.
+let x = new Vec2;
+x.swap().swap();
+Vec2.st();
+let x = 10;

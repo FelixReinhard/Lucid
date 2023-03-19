@@ -8,16 +8,20 @@ pub struct FunctionData {
     pub is_native: bool,
     pub id: usize,
     pub upvalues: Vec<UpValue>,
+    pub is_method: bool,
+    pub is_static: bool,
 }
 
 impl FunctionData {
-    fn new(adress: usize, args_count: u32) -> FunctionData {
+    fn new(adress: usize, args_count: u32, is_method: bool, is_static: bool) -> FunctionData {
         FunctionData {
             adress,
             args_count,
             is_native: false,
             id: 0,
             upvalues: Vec::new(),
+            is_method,
+            is_static,
         }
     }
     fn new_native(args_count: u32, id: usize) -> FunctionData {
@@ -27,6 +31,8 @@ impl FunctionData {
             is_native: true,
             id,
             upvalues: Vec::new(),
+            is_method: false,
+            is_static: false,
         }
     }
 
@@ -82,10 +88,10 @@ impl FunctionTable {
         self.get_mut(&key_opt)
     }
 
-    pub fn put(&mut self, key: String, adress: usize, args_count: u32) -> usize {
+    pub fn put(&mut self, key: String, adress: usize, args_count: u32, is_method: bool, is_static: bool) -> usize {
         self.enter_function(key.clone());
         self.functions
-            .insert(key, FunctionData::new(adress, args_count));
+            .insert(key, FunctionData::new(adress, args_count, is_method, is_static));
         self.top += 1;
         self.top - 1
     }
@@ -96,7 +102,7 @@ impl FunctionTable {
 
         self.enter_function(key.clone());
         self.functions
-            .insert(key, FunctionData::new(adress, args_count));
+            .insert(key, FunctionData::new(adress, args_count, false, false));
         self.top += 1;
         self.lambda_count - 1
     }

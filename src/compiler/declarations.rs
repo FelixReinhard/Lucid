@@ -87,27 +87,59 @@ impl Compiler {
         self.emit(Instruction::Return);
     }
 
+
     fn function(&mut self, tokens: &mut TokenStream) {
         let fn_ = tokens.next().unwrap();
         // get function name
-        let function_name = tokens.consume_identifier(&mut self.error_handler);
+        let mut function_name = tokens.consume_identifier(&mut self.error_handler);
 
         if !self.error_handler.ok() {
             return;
         }
+
+        let mut is_method = false;
+        let mut struct_name = "".to_string();
+        if tokens.match_token(TokenData::DoubleDoublePoint) {
+            is_method = true;
+            struct_name = function_name;
+            function_name = tokens.consume_identifier(&mut self.error_handler);
+        }
+
         // Now we write the functions code, normally one needs to jump over it
         // when calling we jump here and after that jump back
         let jump_over_function_code = self.emit_get(Instruction::Dummy);
 
         tokens.consume(TokenData::ParenOpen, &mut self.error_handler);
         self.locals.new_function();
+        let is_static = match tokens.match_token(TokenData::Keyword("self")) {
+            true => {
+                if tokens.check(TokenData::Coma) {
+                    tokens.next();
+                }
+                false 
+            },
+            false => true 
+        };
 
         let arg_amount = self.function_parameters(tokens);
 
         tokens.consume(TokenData::ParenClose, &mut self.error_handler);
-
+    
         self.functions
-            .put(function_name, jump_over_function_code + 1, arg_amount);
+            .put(function_name.clone(), jump_over_function_code + 1, arg_amount, is_method, is_static);
+        if is_method && !is_static {
+            self.emit(Instruction::DefineSelf(arg_amount as usize + 1));
+        }
+        if is_method {
+            if !self.structs.push_method(&struct_name, self.functions.get(&function_name).unwrap().clone(), function_name.clone()) {
+                self.error_handler.report_error(
+                    LangError::ParsingError(fn_.line ,"Struct does not exist."),
+                    tokens,
+                );
+                return;
+            } 
+        }
+
         if tokens.check(TokenData::Arrow) {
             self.arrow_block_fn(tokens);
             tokens.consume(TokenData::Semicol, &mut self.error_handler);
@@ -125,6 +157,10 @@ impl Compiler {
         }
         // Pop of all arguments and the funcref
         for _ in 0..arg_amount+1 {
+            self.emit(Instruction::Pop);
+        }
+        // Pop self if there 
+        if is_method && !is_static {
             self.emit(Instruction::Pop);
         }
         self.emit(Instruction::Constant(2));

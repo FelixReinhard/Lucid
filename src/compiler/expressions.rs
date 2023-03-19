@@ -1,5 +1,4 @@
 use crate::compiler::core::Compiler;
-use crate::compiler::functions::FunctionData;
 use crate::compiler::tokenstream::TokenStream;
 use crate::lexing::lexer::TokenData;
 use crate::utils::{Constant, LangError, Value};
@@ -24,7 +23,6 @@ impl Compiler {
             );
             return;
         }
-
         match token.tk {
             TokenData::ParenOpen => self.grouping(tokens),
             TokenData::Keyword("fn") => self.lambda(tokens),
@@ -36,6 +34,7 @@ impl Compiler {
             | TokenData::StringLiteral(_)
             | TokenData::Keyword("null") => self.literal(tokens),
             TokenData::Identifier(_) => self.variable(tokens, precedence <= Precedence::Assign),
+            TokenData::Keyword("self") => self.struct_self(tokens),
             TokenData::Keyword("new") => self.struct_instance(tokens),
             _ => {
                 self.error_handler.report_error(
@@ -62,6 +61,11 @@ impl Compiler {
                 _ => self.binary(tokens),
             }
         }
+    }
+
+    fn struct_self(&mut self, tokens: &mut TokenStream) {
+        let selff = tokens.next().unwrap();
+        self.emit(Instruction::GetSelf);
     }
 
     fn struct_access(&mut self, tokens: &mut TokenStream, can_assign: bool) {
@@ -123,6 +127,7 @@ impl Compiler {
         } else {
             self.emit(get);
         }
+
         if is_assigning && !can_assign {
             self.error_handler.report_error(
                 LangError::ParsingError(dot.line, "list: cannot assign here!"),
@@ -135,7 +140,6 @@ impl Compiler {
         let _ = tokens.next().unwrap();
 
         let struct_name = tokens.consume_identifier(&mut self.error_handler);
-
         let s = self.structs.get(&struct_name).unwrap();
 
         if tokens.match_token(TokenData::ParenOpen) {
@@ -150,6 +154,16 @@ impl Compiler {
         } else {
             for _ in 0..s.field_names.len() {
                 self.emit(Instruction::Constant(2));
+            }
+        }
+
+        for function in s.methods.iter() {
+            if !function.is_static {
+                self.emit(Instruction::FuncRef(
+                    function.adress,
+                    function.args_count,
+                    Box::new(Rc::new(RefCell::new(function.upvalues.clone()))),
+                ));
             }
         }
         let map = s.get_name_map();
@@ -521,7 +535,38 @@ impl Compiler {
                     Instruction::SetUpvalue(slot),
                     identifier.line,
                 );
-            } else {
+            } else if let Some(s) = self.structs.get(&ident) {
+                // Static method, 
+                tokens.consume(TokenData::Dot, &mut self.error_handler);
+                if !self.error_handler.ok() {
+                    return;
+                }
+
+                let function_name = tokens.consume_identifier(&mut self.error_handler);
+                if !s.has_static_method(&function_name) {
+                    self.error_handler.report_error(
+                        LangError::ParsingError(identifier.line, "struct does not have this method"),
+                        tokens,
+                    );
+                    return;
+                }
+
+                if let Some(function) = self.functions.get(&function_name) {
+                    self.emit(Instruction::FuncRef(
+                        function.adress,
+                        function.args_count,
+                        Box::new(Rc::new(RefCell::new(function.upvalues.clone()))),
+                    ));
+                } else {
+                    self.error_handler.report_error(
+                        LangError::ParsingError(identifier.line, "Method wasnt found"),
+                        tokens,
+                    );
+                    return;
+                }
+            } 
+
+            else {
                 self.error_handler.report_error(
                     LangError::ParsingError(identifier.line, "variable: Undefined variable!."),
                     tokens,

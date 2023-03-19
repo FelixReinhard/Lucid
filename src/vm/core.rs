@@ -17,6 +17,7 @@ struct CallFrame {
     ip_offset: usize,
     args_count: u32,
     up_values: List,
+    selff: Value,
 }
 
 impl CallFrame {
@@ -26,6 +27,7 @@ impl CallFrame {
             ip_offset,
             args_count,
             up_values,
+            selff: Value::Null,
         }
     }
 
@@ -65,6 +67,12 @@ impl Interpreter {
             debug_value: Value::Null,
             stack: Vec::new(),
             globals: Vec::new(),
+        }
+    }
+
+    fn set_self(&mut self, val: Value) {
+        if let Some(frame) = self.call_frames.last_mut() {
+            frame.selff = val;
         }
     }
 
@@ -199,6 +207,12 @@ impl Interpreter {
                                     // pop off all locals and the funcref value
                                     self.pop();
                                 }
+                                match frame.selff {
+                                    Value::StructInstance(_, _) => {
+                                        self.pop();
+                                    }
+                                    _ => {}
+                                }
                                 self.ip = frame.return_adress - 1;
                                 self.push(top);
                             }
@@ -212,6 +226,36 @@ impl Interpreter {
                         return Err(LangError::RuntimeMessage(
                             "Return could not get stack top value",
                         ));
+                    }
+                }
+                Instruction::Struct(map) => {
+                    let mut values = Vec::new();
+                    for _ in 0..map.len() {
+                        if let Some(val) = self.pop() {
+                            values.push(val);
+                        } else {
+                            return Err(LangError::RuntimeMessage("Couldnt pop"));
+                        }
+                    }
+                    values.reverse();
+
+                    self.push(Value::StructInstance(
+                        Rc::new(Box::new(RefCell::new(values))),
+                        map,
+                    ));
+                }
+                Instruction::DefineSelf(offset) => {
+                    if let Some(val) = self.stack.get(self.stack.len() - 1 - offset) {
+                        self.set_self(val.clone());
+                    } else {
+                        return Err(LangError::RuntimeMessage("Couldnt pop for def self"));
+                    }
+                }
+                Instruction::GetSelf => {
+                    if let Some(frame) = self.call_frames.last() {
+                        self.push(frame.selff.clone());
+                    } else {
+                        return Err(LangError::RuntimeMessage("No selff here"));
                     }
                 }
                 Instruction::CallFunc(args_given) => {
@@ -274,12 +318,15 @@ impl Interpreter {
                 }
                 Instruction::SetUpvalue(index) => {
                     if let Some(val) = self.peek() {
-                        let ref mut upvalue = *self.call_frames.last().unwrap().up_values.borrow_mut();
+                        let ref mut upvalue =
+                            *self.call_frames.last().unwrap().up_values.borrow_mut();
                         if let Value::Shared(ref mut old) = upvalue[index] {
                             old.replace_with(|&mut _| val);
-                        } 
+                        }
                     } else {
-                        return Err(LangError::RuntimeMessage("Cannot set Upvalue, no value there"));
+                        return Err(LangError::RuntimeMessage(
+                            "Cannot set Upvalue, no value there",
+                        ));
                     }
                 }
                 Instruction::FuncRef(adress, args_count, up_value_definitions) => {
@@ -383,6 +430,27 @@ impl Interpreter {
                     return Err(LangError::RuntimeMessage(
                         "Could not pop integer for array access",
                     ));
+                }
+                Instruction::StructGet(name) => {
+                    let popped = self.pop();
+                    if let Some(Value::StructInstance(values, names)) = popped {
+                        let value = values.borrow()[*names.get(&*name).unwrap()].clone();
+                        if let Value::Func(_, _, _) = value {
+                            self.push(Value::StructInstance(values, names));
+                        }
+                        self.push(value);
+                    } else {
+                        return Err(LangError::RuntimeMessage("Could not pop struct for get"));
+                    }
+                }
+                Instruction::StructSet(name) => {
+                    let val = self.pop().unwrap();
+                    if let Some(Value::StructInstance(values, names)) = self.peek() {
+                        let mut borrow = values.borrow_mut();
+                        borrow[*names.get(&*name).unwrap()] = val;
+                    } else {
+                        return Err(LangError::RuntimeMessage("Could not pop struct for get"));
+                    }
                 }
                 Instruction::Dup(amount) => {
                     for i in self.stack.len() - amount..self.stack.len() {

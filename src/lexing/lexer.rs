@@ -31,6 +31,7 @@ pub enum TokenData {
     BrackClose,
     Coma,
     DoublePoint,
+    DoubleDoublePoint,
     Semicol,
     I64Literal(i64),
     F64Literal(f64),
@@ -64,6 +65,7 @@ pub enum TokenData {
     PlusPlus,
     MinusMinus,
     Empty,
+    Dot,
     EOF,
     DEBUG,
 }
@@ -103,9 +105,10 @@ pub fn lex(code: String) -> Result<VecDeque<Token>, LangError> {
             '[' => lexer.push(TokenData::BrackOpen),
             ']' => lexer.push(TokenData::BrackClose),
             ',' => lexer.push(TokenData::Coma),
-            ':' => lexer.push(TokenData::DoublePoint),
             ';' => lexer.push(TokenData::Semicol),
             '%' => lexer.push(TokenData::Percent),
+            '.' => lexer.push(TokenData::Dot),
+            ':' => lexer.double_point(), 
             '=' => lexer.equals(),
             '*' => lexer.star(),
             '/' => lexer.slash(),
@@ -175,6 +178,19 @@ impl Lexer {
             None
         }
     }
+    
+    fn double_point(&mut self) {
+        if self.current >= self.chars.len() {
+            self.push(TokenData::Equals);
+            return;
+        }
+
+        match self.peek(1).unwrap_or('0') {
+            ':' => self.push_and_next(TokenData::DoubleDoublePoint),
+            _ => self.push(TokenData::DoublePoint),
+        }
+    }
+
 
     fn equals(&mut self) {
         if self.current >= self.chars.len() {

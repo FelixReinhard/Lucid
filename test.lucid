@@ -1,7 +1,10 @@
-let n = now();
-{
-  for i in range(2000) => 
-    print(i);
+struct Vec2{x, y}
 
-}
-print("elapsed: " + (now() - n));
+// normal method 
+fn Vec2::get_x(self) => self.x;
+// static method
+fn Vec2::create() => new Vec2(0, 0);
+
+let vec = Vec2.create();
+let x = vec.get_x();
+print(x);

@@ -265,7 +265,6 @@ impl Compiler {
             }
             false => true,
         };
-
         let arg_amount = self.function_parameters(tokens);
 
         tokens.consume(TokenData::ParenClose, &mut self.error_handler);

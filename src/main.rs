@@ -5,8 +5,10 @@ mod compiler;
 mod args;
 
 use crate::lexing::lexer;
+use crate::lexer::Token;
 use crate::args::ArgParser;
 use std::env;
+use std::collections::VecDeque;
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
@@ -29,7 +31,7 @@ fn main() {
     }
 
     if arg_parser.tokens() { 
-        println!("{:?}", tokens);
+        print_tokens(&tokens);
     }
     let chunk_res = compiler::core::compile(tokens); 
     let chunk;
@@ -56,4 +58,15 @@ fn main() {
     }
 }
 
-
+fn print_tokens(tokens: &VecDeque<Token>) {
+    let mut current_file = String::new();
+    for token in tokens {
+        if current_file != token.filename {
+            println!("\nFile: {}", token.filename);
+            println!("=======================");
+            current_file = token.filename.clone();
+        }
+        println!(" - {:?}", token.tk);
+    }
+    println!("");
+}

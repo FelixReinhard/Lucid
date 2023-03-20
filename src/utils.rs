@@ -85,17 +85,13 @@ impl Value {
             Self::Str(s) => format!("{}", s),
             Self::Func(name, _, _) => format!("fn: <{}>", name),
             Self::Shared(val) => val.borrow().to_string(),
-            Self::StructInstance(ls, map) => {
+            Self::StructInstance(ls, _) => {
                 let s = format!(
-                    "struct names: ({}), values: ({})",
+                    "struct : ({})",
                     ls.borrow().iter().fold(String::new(), |acc, x| format!(
                         "{}{}",
                         acc,
                         format!("{}, ", x.to_string())
-                    )),
-                    map.iter().fold(String::new(), |acc, (key, value)| format!(
-                        "{}:{}, {}",
-                        key, value, acc
                     )),
                 );
                 s
@@ -109,8 +105,10 @@ impl Value {
                         format!(", {}", x.to_string())
                     ))
                 );
-                s.remove(1);
-                s.remove(1);
+                if s.len() > 2 {
+                    s.remove(1);
+                    s.remove(1);
+                }
                 s
             }
         }

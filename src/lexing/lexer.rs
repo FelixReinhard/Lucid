@@ -11,6 +11,7 @@ macro_rules! kw {
 pub struct Token {
     pub tk: TokenData,
     pub line: u32,
+    pub filename: String,
 }
 
 impl Token {
@@ -67,7 +68,6 @@ pub enum TokenData {
     Empty,
     Dot,
     EOF,
-    DEBUG,
 }
 
 impl TokenData{
@@ -89,12 +89,11 @@ pub fn lex_file(path: &String) -> Result<VecDeque<Token>, LangError> {
         return Err(LangError::Unknown);
     }
     let code = file.unwrap();
-
-    lex(code)
+    lex(code, path.clone())
 }
 
-pub fn lex(code: String) -> Result<VecDeque<Token>, LangError> {
-    let mut lexer = Lexer::new(code);
+pub fn lex(code: String, filename: String) -> Result<VecDeque<Token>, LangError> {
+    let mut lexer = Lexer::new(code, filename);
     
     while lexer.current < lexer.chars.len() {
         match lexer.chars[lexer.current] {
@@ -140,21 +139,32 @@ struct Lexer {
     tokens: VecDeque<Token>,
     had_error: bool,
     line: u32,
+    filenames: Vec<String>, // the files that have already been lexed
+    filename: String,
 }
 
 impl Lexer {
-    fn new(code: String) -> Lexer {
+    fn new(code: String, filename: String) -> Lexer {
         Lexer {
             current: 0,
             chars: code.chars().collect(),
             tokens: VecDeque::new(),
             had_error: false,
             line: 1,
+            filenames: Vec::new(),
+            filename,
         }
     }
 
     fn push(&mut self, tk: TokenData) {
-        self.tokens.push_back(Token{tk, line: self.line});
+        self.tokens.push_back(Token{tk, line: self.line, filename: self.filename.clone()});
+    }
+
+    fn push_list(&mut self, mut tokens: VecDeque<Token>, filename: String) {
+        self.filenames.push(filename);
+        while !tokens.is_empty() {
+            self.tokens.push_back(tokens.pop_front().unwrap());
+        }
     }
 
     fn push_and_next(&mut self, tk: TokenData) {
@@ -514,11 +524,38 @@ impl Lexer {
             "if" => kw!(self, "if"),
             "else" => kw!(self, "else"),
             "return" => kw!(self, "return"),
-            "import" => kw!(self, "import"),
             "or" => self.push(TokenData::LogicalOr),
             "and" => self.push(TokenData::LogicalAnd),
             "null" => kw!(self, "null"),
-            "debug" => self.push(TokenData::DEBUG), // remove in realease TODO 
+            "for" => kw!(self, "for"),
+            "in" => kw!(self, "in"),
+            "import" => {
+                let mut file = String::new();
+
+                while let Some(c) = self.peek(1) {
+                    match c {
+                        '\n' | '\r' | ' ' => { self.next(); },
+                        _ => break
+                    }
+                }
+
+                while let Some(c) = self.peek(1) {
+                    if c.is_alphabetic() || c.is_digit(10) || c == '_' {
+                        file.push(c);
+                    } else {
+                        break;
+                    }
+                    self.next();
+                }
+                file.push_str(".lucid");
+                if !self.filenames.contains(&file) {
+                    if let Ok(imported_file_tokens) = lex_file(&file) {
+                        self.push_list(imported_file_tokens, file);
+                    } else {
+                        self.error("Couldnt lex other file");
+                    }
+                }
+            }
             _ => self.push(TokenData::Identifier(ident)),
         }
     }

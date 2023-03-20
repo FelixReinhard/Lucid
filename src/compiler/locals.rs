@@ -89,7 +89,10 @@ impl Locals {
     }
     pub fn end_function(&mut self) {
         if !self.local_call_fame_offsets.is_empty() {
-            self.local_call_fame_offsets.pop();
+            let desired_stack_height = self.local_call_fame_offsets.pop().unwrap();
+            while self.locals.len() > desired_stack_height {
+                self.locals.pop();
+            }
         }
     }
 }

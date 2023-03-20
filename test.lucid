@@ -1,11 +1,5 @@
 struct Vec2{x, y}
 fn Vec2::st() => print("static");
-
-fn Vec2::swap(self) {
-  print(self.x);
-  return self;
-}
 let x = new Vec2;
-x.swap().swap();
-Vec2.st();
+x.swap();
 let x = 10;

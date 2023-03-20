@@ -31,13 +31,39 @@ impl Compiler {
             TokenData::Keyword("while") => self.while_statement(tokens),
             TokenData::Keyword("for") => self.for_statement(tokens),
             TokenData::Keyword("return") => self.return_statement(tokens),
+            TokenData::Keyword("import") => self.import_statement(tokens),
             TokenData::Semicol => {
                 tokens.next();
             }
             _ => self.expression_statement(tokens),
         }
     }
-    // Consider for i in x 
+    // The std and any packages are stored
+    // - on linux in /usr/local/lib/lucid/
+    fn import_statement(&mut self, tokens: &mut TokenStream) {
+        let import = tokens.next().unwrap();
+        if let Some(token) = tokens.next() {
+            if let TokenData::StringLiteral(s) = token.tk {
+                let path = crate::utils::get_import_path(s);
+                match crate::lexer::lex_file(&path) {
+                    Ok(toks) => {
+                        if self.print_toks {
+                            crate::utils::print_tokens(&toks);
+                        }
+                        self.compile_import(&mut TokenStream::new(toks));
+                        tokens.consume(TokenData::Semicol, &mut self.error_handler);
+                        return;
+                    }
+                    Err(e) => self.error_handler.report_error(e, tokens),
+                }
+            }
+        }
+        self.error_handler.report_error(
+            LangError::ParsingError(import.line, "Could not import file."),
+            tokens,
+        );
+    }
+    // Consider for i in x
     fn for_statement(&mut self, tokens: &mut TokenStream) {
         self.begin_scope();
         let for_ = tokens.next().unwrap();
@@ -46,7 +72,7 @@ impl Compiler {
         // create the loop var as a variable and set it to null.
         // In each iteration before the block executes it will be set to the next element of the
         // list
-        self.emit(Instruction::Constant(2)); // emit null 
+        self.emit(Instruction::Constant(2)); // emit null
         if self.locals.is_global_scope() {
             let var_pointer = self.globals.put(i.clone());
             self.emit(Instruction::DefGlobal(var_pointer));
@@ -57,7 +83,7 @@ impl Compiler {
         tokens.consume(TokenData::Keyword("in"), &mut self.error_handler);
 
         // create a variable for the expression, it should be a list
-        // and save it in "0f", as the name starts with a number it cannot be created by 
+        // and save it in "0f", as the name starts with a number it cannot be created by
         // the programmer.
         self.expression(tokens);
         let x = format!("{}f", self.for_loop_count);
@@ -106,10 +132,9 @@ impl Compiler {
         let jump_exit = self.emit_get(Instruction::Dummy);
         self.emit(Instruction::Pop);
 
-
         // set the loop var to the current index,
         // loopvar = {}f[{}if]
-        // first get {}f 
+        // first get {}f
         if self.locals.is_global_scope() {
             let slot = self.globals.get(&x).unwrap();
             self.emit(Instruction::GetGlobal(slot));
@@ -117,7 +142,7 @@ impl Compiler {
             let slot = self.locals.get_local(&x).unwrap();
             self.emit(Instruction::GetLocal(slot));
         }
-        // now get the index 
+        // now get the index
         if self.locals.is_global_scope() {
             let slot = self.globals.get(&index_var_name).unwrap();
             self.emit(Instruction::GetGlobal(slot));
@@ -127,7 +152,7 @@ impl Compiler {
         }
         // access the list.
         self.emit(Instruction::AccessList);
-        // now set the loopvar 
+        // now set the loopvar
         if self.locals.is_global_scope() {
             let slot = self.globals.get(&i).unwrap();
             self.emit(Instruction::SetGlobal(slot));
@@ -153,8 +178,8 @@ impl Compiler {
             );
             return;
         }
-        
-        // increase index value {}if 
+
+        // increase index value {}if
         // first get the var
         if self.locals.is_global_scope() {
             let slot = self.globals.get(&index_var_name).unwrap();

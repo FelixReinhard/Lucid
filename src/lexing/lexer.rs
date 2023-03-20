@@ -86,7 +86,7 @@ impl TokenData{
 pub fn lex_file(path: &String) -> Result<VecDeque<Token>, LangError> {
     let file = fs::read_to_string(path);
     if let Err(_) = file {
-        return Err(LangError::Unknown);
+        return Err(LangError::LexingError(0));
     }
     let code = file.unwrap();
     lex(code, path.clone())
@@ -530,31 +530,32 @@ impl Lexer {
             "for" => kw!(self, "for"),
             "in" => kw!(self, "in"),
             "import" => {
-                let mut file = String::new();
-
-                while let Some(c) = self.peek(1) {
-                    match c {
-                        '\n' | '\r' | ' ' => { self.next(); },
-                        _ => break
-                    }
-                }
-
-                while let Some(c) = self.peek(1) {
-                    if c.is_alphabetic() || c.is_digit(10) || c == '_' {
-                        file.push(c);
-                    } else {
-                        break;
-                    }
-                    self.next();
-                }
-                file.push_str(".lucid");
-                if !self.filenames.contains(&file) {
-                    if let Ok(imported_file_tokens) = lex_file(&file) {
-                        self.push_list(imported_file_tokens, file);
-                    } else {
-                        self.error("Couldnt lex other file");
-                    }
-                }
+                kw!(self, "import");
+                // let mut file = String::new();
+                //
+                // while let Some(c) = self.peek(1) {
+                //     match c {
+                //         '\n' | '\r' | ' ' => { self.next(); },
+                //         _ => break
+                //     }
+                // }
+                //
+                // while let Some(c) = self.peek(1) {
+                //     if c.is_alphabetic() || c.is_digit(10) || c == '_' {
+                //         file.push(c);
+                //     } else {
+                //         break;
+                //     }
+                //     self.next();
+                // }
+                // file.push_str(".lucid");
+                // if !self.filenames.contains(&file) {
+                //     if let Ok(imported_file_tokens) = lex_file(&file) {
+                //         self.push_list(imported_file_tokens, file);
+                //     } else {
+                //         self.error("Couldnt lex other file");
+                //     }
+                // }
             }
             _ => self.push(TokenData::Identifier(ident)),
         }

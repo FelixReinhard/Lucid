@@ -2,6 +2,8 @@ use crate::lexing::lexer::TokenData;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::collections::VecDeque;
+use crate::lexer::Token;
 
 #[derive(Debug)]
 pub enum LangError {
@@ -161,4 +163,60 @@ impl Value {
             _ => None,
         }
     }
+}
+
+const LINUX_LIB_PATH: &str = "";
+const WINDOWS_LIB_PATH: &str = "";
+
+pub fn standard_path() -> PathBuf {
+    let mut buf = PathBuf::new();
+    buf.push(match std::env::consts::OS {
+        "linux" => LINUX_LIB_PATH,
+        "windows" => WINDOWS_LIB_PATH,
+        _ => "",
+    });
+    buf
+}
+
+use std::path::PathBuf;
+
+pub fn get_import_path(name: String) -> String {
+    let standard_path = standard_path();    
+    // replace the "
+    let name = name.replace("\"", "");
+    let mut path_from_import_statement = PathBuf::new();
+    let mut is_std = false;
+    for s in name.split("::") {
+        if s == "std" {
+            is_std = true;
+        }
+        path_from_import_statement.push(s);
+    }
+    if is_std {
+        let mut buf = PathBuf::new();
+        buf.push(standard_path);
+        buf.push(path_from_import_statement);
+        path_from_import_statement = buf;
+    }
+
+    format!(
+        "{}.lucid",
+        path_from_import_statement
+            .into_os_string()
+            .into_string()
+            .unwrap()
+    )
+}
+
+pub fn print_tokens(tokens: &VecDeque<Token>) {
+    let mut current_file = String::new();
+    for token in tokens {
+        if current_file != token.filename {
+            println!("\nFile: {}", token.filename);
+            println!("=======================");
+            current_file = token.filename.clone();
+        }
+        println!(" - {:?}", token.tk);
+    }
+    println!("");
 }

@@ -1,70 +1,7 @@
-/*
-  A List type to implement everything a good list should have
-*/
+import "std::List";
 
-struct List{ls}
-// add one element to the list
-
-fn List::push_back(self, elem) => push(self.ls, elem);
-
-// adds a whole range, or list to the list.
-fn List::push_back_range(self, elements) {
-  for elem in elements {
-    self.add(elem);
-  }
-}
-
-fn List::last(self) {
-  if len(self.ls) > 0 {
-    return self.ls[len(self.ls) - 1];
-  }
-  return null;
-}
-fn List::push_front(self, elem) {
-  if len(self.ls) == 0 {
-    push(self.ls, elem);
-    return;
-  }
-  let last = self.last();
-  let i = len(self.ls) - 2;
-  while i >= 1 {
-    self.ls[i] = self.ls[i-1];
-    i--;
-  }
-  self.ls[0] = elem;
-  push(self.ls, last);
-}
-
-// gets the actual list element
-fn List::get(self) => self.ls;
-fn List::rev(self) {
-  let new_ls = [];
-  let i = len(self.ls) - 1;
-  while i >= 0 {
-    push(new_ls, self.ls[i]);
-    i--;
-  }
-  return new List(new_ls);
-}
-
-fn List::to_str(self) => self.ls;
-
-fn List::map(self, function) {
-  let i = 0;
-  while i < len(self.ls) {
-    self.ls[i] = function(self.ls[i]);
-    i++;
-  }
-}
-fn List::fold(self, start_val, func) {
-  for i in self.ls {
-    start_val = func(start_val, i);
-  }
-  return start_val;
-}
-
-// create methods always at the very end.
-fn List::create() => new List([]);
-let x = List.create();
-x.push_front(100);
-print(x.to_str());
+let list = List.create();
+list.push_front_range([1, 2, 3]);
+list.push_front_range([4, 5, 6]);
+list.insert(2, "hello");
+print(list);

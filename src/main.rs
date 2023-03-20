@@ -5,13 +5,16 @@ mod compiler;
 mod args;
 
 use crate::lexing::lexer;
-use crate::lexer::Token;
 use crate::args::ArgParser;
 use std::env;
-use std::collections::VecDeque;
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
+    // TODO remove for releases
+    // if let Err(e) = update_std() {
+    //     println!("{:?}", e);
+    //     return;
+    // }
     let args: Vec<String> = std::env::args().collect();
     
     let arg_parser = ArgParser::new(&args);
@@ -31,9 +34,9 @@ fn main() {
     }
 
     if arg_parser.tokens() { 
-        print_tokens(&tokens);
+        crate::utils::print_tokens(&tokens);
     }
-    let chunk_res = compiler::core::compile(tokens); 
+    let chunk_res = compiler::core::compile(tokens, arg_parser.tokens()); 
     let chunk;
 
     if let Some(c) = chunk_res {
@@ -58,15 +61,21 @@ fn main() {
     }
 }
 
-fn print_tokens(tokens: &VecDeque<Token>) {
-    let mut current_file = String::new();
-    for token in tokens {
-        if current_file != token.filename {
-            println!("\nFile: {}", token.filename);
-            println!("=======================");
-            current_file = token.filename.clone();
-        }
-        println!(" - {:?}", token.tk);
-    }
-    println!("");
-}
+// only when compiling from source.
+// fn update_std() -> std::io::Result<()> {
+//     if std::path::Path::new("std").is_dir() {
+//         println!("Updating std");
+//         let mut path = crate::utils::standard_path();
+//         path.push("std");
+//         std::fs::create_dir_all(path.clone())?;
+//         for entry in std::fs::read_dir("./std")? {
+//             let entry = entry?;
+//             if entry.file_type()?.is_dir() {
+//
+//             } else {
+//                 // std::fs::copy(entry.path(), path.join(entry.file_name()))?;
+//             }
+//         }
+//     }
+//     Ok(())
+// }

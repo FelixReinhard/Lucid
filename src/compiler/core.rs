@@ -10,9 +10,9 @@ use crate::vm::chunk::Chunk;
 use crate::vm::instructions::Instruction;
 use std::collections::VecDeque;
 
-pub fn compile(tokens: VecDeque<Token>) -> Option<Chunk> {
+pub fn compile(tokens: VecDeque<Token>, print_toks: bool) -> Option<Chunk> {
     let mut token_stream = TokenStream::new(tokens);
-    let compiler = Compiler::new();
+    let compiler = Compiler::new(print_toks);
     compiler.compile(&mut token_stream)
 }
 
@@ -24,10 +24,11 @@ pub struct Compiler {
     pub functions: FunctionTable,
     pub structs: StructTable,
     pub for_loop_count: u32,
+    pub print_toks: bool,
 }
 
 impl Compiler {
-    fn new() -> Compiler {
+    fn new(print_toks: bool) -> Compiler {
         let mut chunk = Chunk::new();
         chunk.push_constant(Constant::Bool(true));
         chunk.push_constant(Constant::Bool(false));
@@ -41,6 +42,7 @@ impl Compiler {
             functions: FunctionTable::new(),
             structs: StructTable::new(),
             for_loop_count: 0,
+            print_toks,
         }
         .define_natives()
     }
@@ -53,6 +55,12 @@ impl Compiler {
             Some(self.chunk)
         } else {
             None
+        }
+    }
+
+    pub fn compile_import(&mut self, tokens: &mut TokenStream) {
+        while tokens.peek_not_eq(TokenData::EOF) && self.error_handler.can_continue() {
+            self.declaration(tokens);
         }
     }
 

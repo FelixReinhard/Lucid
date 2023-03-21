@@ -22,6 +22,11 @@ cargo build --release
 ```
 The executable can then be found in */target/release/*. Optionally put this file into your */bin/* folder or in any other folder in your $PATH
 
+You can also just run it directly from source with 
+```shell
+cargo run --release test.lucid
+```
+
 ## Usage
 To run a script, simply put the code in a file with the ending **.lucid**.
 ```shell
@@ -136,9 +141,22 @@ Note that if you would put the method **"create"** above **"get_x"**, the result
 
 
 ### Imports 
-Lastly, it is also possible to import other files. Semantically, this means the contents of the imported file is simply copied to this place, very much like the include of c. The import does not need a semicolon, but can be put there for aesthetic reasons.
+Lastly, it is also possible to import other files. Semantically, this means the contents of the imported file is simply copied to this place, very much like the include of c
 ```py
-import file; // imports file.lucid
+import "file"; // imports file.lucid
+```
+If you run the interpreter with "cargo run --release <file>.lucid", you can also use the standard libary, which is more like a small collection of examples. You can find the source code in the **std** folder.
+
+```py
+import "std::List"; 
+
+let x = List.create();
+x.push_front(100);
+x.map(
+  fn (elem) => elem* 2
+);
+print(x.to_str());
+
 ```
 
 ## Architecture, Performance and Problems.

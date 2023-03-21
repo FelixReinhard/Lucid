@@ -1,7 +1,4 @@
-import "std::List";
+import "std::String";
 
-let list = List.create();
-list.push_front_range([1, 2, 3]);
-list.push_front_range([4, 5, 6]);
-list.insert(2, "hello");
-print(list);
+let s = String.from("Hello");
+print(s.get_at(0));

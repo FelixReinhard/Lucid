@@ -1,0 +1,7 @@
+struct String{str}
+
+fn String::get_at(self, index) => __string_get_at(self.str, index);
+
+// create 
+fn String::create() => new String("");
+fn String::from(str) => new String(str);

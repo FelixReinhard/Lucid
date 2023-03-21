@@ -17,6 +17,7 @@ impl Compiler {
         def!(self, "now", 5, 0);
         def!(self, "read_file", 6, 0);
         def!(self, "push", 7, 2);
+        def!(self, "__string_get_at", 8, 1);
         self
     }
 }

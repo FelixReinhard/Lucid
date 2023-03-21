@@ -18,8 +18,21 @@ pub fn execute_native_function(id: usize, args: Vec<Value>) -> Option<Value> {
         5 => native_now(args),
         6 => native_read_file(args),
         7 => native_push(args),
+        8 => native_string_get_at(args),
         _ => None,
     }
+}
+
+fn native_string_get_at(args: Vec<Value>) -> Option<Value> {
+    if let Some(Value::Str(s)) = args.get(1) {
+        if let Some(Value::Integer(i)) = args.get(0) {
+            let c = s.chars().nth(*i as usize);
+            if let Some(cc) = c {
+                return Some(Value::Str(Rc::new(format!("{}", cc))));
+            }
+        }
+    }
+    None
 }
 
 fn native_push(args: Vec<Value>) -> Option<Value> {

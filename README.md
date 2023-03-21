@@ -22,6 +22,11 @@ cargo build --release
 ```
 The executable can then be found in */target/release/*. Optionally put this file into your */bin/* folder or in any other folder in your $PATH
 
+You can also just run it directly from source with 
+```shell
+cargo run --release test.lucid
+```
+
 ## Usage
 To run a script, simply put the code in a file with the ending **.lucid**.
 ```shell

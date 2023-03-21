@@ -5,7 +5,7 @@ use crate::compiler::structs::StructTable;
 use crate::compiler::locals::Locals;
 use crate::compiler::tokenstream::TokenStream;
 use crate::lexer::{Token, TokenData};
-use crate::utils::{Constant, LangError, Value};
+use crate::utils::Constant;
 use crate::vm::chunk::Chunk;
 use crate::vm::instructions::Instruction;
 use std::collections::VecDeque;

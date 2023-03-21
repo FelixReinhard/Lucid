@@ -6,7 +6,6 @@ use std::rc::Rc;
 use std::{thread, time};
 use std::time::SystemTime;
 use std::fs;
-use std::path::Path;
 
 pub fn execute_native_function(id: usize, args: Vec<Value>) -> Option<Value> {
     match id {

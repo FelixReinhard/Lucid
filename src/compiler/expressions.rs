@@ -1,7 +1,7 @@
 use crate::compiler::core::Compiler;
 use crate::compiler::tokenstream::TokenStream;
 use crate::lexing::lexer::TokenData;
-use crate::utils::{Constant, LangError, Value};
+use crate::utils::{Constant, LangError};
 use crate::vm::instructions::Instruction;
 
 use std::cell::RefCell;
@@ -64,7 +64,7 @@ impl Compiler {
     }
 
     fn struct_self(&mut self, tokens: &mut TokenStream) {
-        let selff = tokens.next().unwrap();
+        let _selff = tokens.next().unwrap();
         self.emit(Instruction::GetSelf);
     }
 

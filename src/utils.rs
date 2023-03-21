@@ -8,12 +8,10 @@ use crate::lexer::Token;
 #[derive(Debug)]
 pub enum LangError {
     None,
-    Unknown,
     LexingError(u32),
     Runtime,
     RuntimeMessage(&'static str),
     RuntimeDivByZero,
-    RuntimeArithmetic(u32, &'static str),
     ParsingError(u32, &'static str),
     UnknownParsing(&'static str),
     ParsingConsume(u32, TokenData),

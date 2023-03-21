@@ -1,7 +1,7 @@
 use crate::compiler::core::Compiler;
 use crate::compiler::structs::StructDef;
 use crate::compiler::tokenstream::TokenStream;
-use crate::lexing::lexer::{Token, TokenData};
+use crate::lexing::lexer::TokenData;
 use crate::utils::LangError;
 use crate::vm::instructions::Instruction;
 

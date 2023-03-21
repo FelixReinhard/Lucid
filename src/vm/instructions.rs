@@ -8,7 +8,6 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
-    DEBUG, 
     Dummy, // used for patching jumps
     Return,
     Constant(usize),

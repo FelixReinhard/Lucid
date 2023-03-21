@@ -114,15 +114,15 @@ impl TokenStream {
     }
     
     // Advance if next token is not this one 
-    pub fn dont_match_token(&mut self, token_type: TokenData) -> bool {
-       if let Some(tk) = self.peek() {
-            if !tk.tk.is_eq(&token_type) {
-                self.next();
-                return true;
-            }
-        }
-        false
-    }
+    // pub fn dont_match_token(&mut self, token_type: TokenData) -> bool {
+    //    if let Some(tk) = self.peek() {
+    //         if !tk.tk.is_eq(&token_type) {
+    //             self.next();
+    //             return true;
+    //         }
+    //     }
+    //     false
+    // }
     
     // Only advances if none of the specified tokens are the next one
     pub fn dont_match_tokens(&mut self, token_types: Vec<TokenData>) -> bool {

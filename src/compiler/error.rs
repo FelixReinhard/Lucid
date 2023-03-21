@@ -4,7 +4,6 @@ use crate::utils::LangError;
 
 pub struct ErrorHandler {
     had_error: bool,
-    panic_mode: bool,
     error: LangError,
 }
 
@@ -12,7 +11,6 @@ impl ErrorHandler {
     pub fn new() -> ErrorHandler {
         ErrorHandler {
             had_error: false,
-            panic_mode: false,
             error: LangError::None,
         }
     }

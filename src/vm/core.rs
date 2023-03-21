@@ -1,4 +1,4 @@
-use crate::utils::{LangError, List, SVal, UpValue, UpValueList, Value};
+use crate::utils::{LangError, List, UpValue, UpValueList, Value};
 use crate::vm::chunk::Chunk;
 use crate::vm::instructions::Instruction;
 use crate::vm::native::execute_native_function;
@@ -15,17 +15,15 @@ pub fn interpret(chunk: Chunk, print_stack: bool) -> Result<Value, LangError> {
 struct CallFrame {
     return_adress: usize,
     ip_offset: usize,
-    args_count: u32,
     up_values: List,
     selff: Value,
 }
 
 impl CallFrame {
-    fn new(return_adress: usize, ip_offset: usize, args_count: u32, up_values: List) -> CallFrame {
+    fn new(return_adress: usize, ip_offset: usize, up_values: List) -> CallFrame {
         CallFrame {
             return_adress,
             ip_offset,
-            args_count,
             up_values,
             selff: Value::Null,
         }
@@ -55,7 +53,6 @@ impl Interpreter {
     fn new(chunk: Chunk) -> Interpreter {
         let mut call_frames: Vec<CallFrame> = Vec::new();
         call_frames.push(CallFrame::new(
-            0,
             0,
             0,
             Rc::new(Box::new(RefCell::new(Vec::new()))),
@@ -161,11 +158,6 @@ impl Interpreter {
                 );
             }
             match instruction {
-                Instruction::DEBUG => {
-                    let v = self.pop().unwrap_or(Value::Null);
-                    println!("Debug : {:?}", v.to_string());
-                    self.debug_value = v;
-                }
                 Instruction::JumpIfFalse(amount) => match self.peek() {
                     Some(val) => {
                         if let Some(jump) = val.is_falsey() {
@@ -283,7 +275,6 @@ impl Interpreter {
                         self.call_frames.push(CallFrame::new(
                             self.ip + 1,
                             self.stack.len() - args,
-                            *args_count,
                             Rc::clone(up_vals),
                         ));
                         self.ip = *adress;

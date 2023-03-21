@@ -1,4 +1,8 @@
-import "std::String";
+import "std::List"; 
 
-let s = String.from("Hello");
-print(s.get_at(0));
+let x = List.create();
+x.push_front(100);
+x.map(
+  fn (elem) => elem* 2
+);
+print(x.to_str());

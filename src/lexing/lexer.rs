@@ -14,12 +14,6 @@ pub struct Token {
     pub filename: String,
 }
 
-impl Token {
-    pub fn same(&self, other: &Token) -> bool {
-        self.tk.is_eq(&other.tk)
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenData {
     Keyword(&'static str),
@@ -139,7 +133,6 @@ struct Lexer {
     tokens: VecDeque<Token>,
     had_error: bool,
     line: u32,
-    filenames: Vec<String>, // the files that have already been lexed
     filename: String,
 }
 
@@ -151,7 +144,6 @@ impl Lexer {
             tokens: VecDeque::new(),
             had_error: false,
             line: 1,
-            filenames: Vec::new(),
             filename,
         }
     }
@@ -160,12 +152,11 @@ impl Lexer {
         self.tokens.push_back(Token{tk, line: self.line, filename: self.filename.clone()});
     }
 
-    fn push_list(&mut self, mut tokens: VecDeque<Token>, filename: String) {
-        self.filenames.push(filename);
-        while !tokens.is_empty() {
-            self.tokens.push_back(tokens.pop_front().unwrap());
-        }
-    }
+    // fn push_list(&mut self, mut tokens: VecDeque<Token>, filename: String) {
+    //     while !tokens.is_empty() {
+    //         self.tokens.push_back(tokens.pop_front().unwrap());
+    //     }
+    // }
 
     fn push_and_next(&mut self, tk: TokenData) {
         self.push(tk);

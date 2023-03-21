@@ -59,11 +59,11 @@ impl FunctionTable {
         }
     }
 
-    pub fn print_functions(&self) {
-        for func in self.functions.iter() {
-            println!("{:?}", func);
-        }
-    }
+    // pub fn print_functions(&self) {
+    //     for func in self.functions.iter() {
+    //         println!("{:?}", func);
+    //     }
+    // }
 
     pub fn get(&self, key: &String) -> Option<&FunctionData> {
         self.functions.get(key)

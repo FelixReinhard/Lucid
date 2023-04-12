@@ -82,5 +82,13 @@ fn List::insert(self, index, elem) {
   push(self.ls, last);
 }
 
+fn List::any(self, func) {
+  let res = false;
+  for elem in self.ls {
+    if func(elem) => res = true;
+  }
+  return res;
+}
+
 // create methods always at the very end.
 fn List::create() => new List([]);

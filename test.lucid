@@ -5,4 +5,4 @@ x.push_front(100);
 x.map(
   fn (elem) => elem* 2
 );
-print(x.to_str());
+print(x.any(fn (x) => x > 4));

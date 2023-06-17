@@ -90,5 +90,12 @@ fn List::any(self, func) {
   return res;
 }
 
+fn List::filter(self, func) {
+  let new_ls = [];
+  for elem in self.ls {
+    if func(elem) => push(new_ls, elem);
+  }
+  return new_ls;
+}
 // create methods always at the very end.
 fn List::create() => new List([]);

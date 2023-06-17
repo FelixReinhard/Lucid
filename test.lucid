@@ -1,8 +1,8 @@
-import "std::List"; 
+import "std::List";
 
 let x = List.create();
 x.push_front(100);
 x.map(
   fn (elem) => elem* 2
 );
-print(x.any(fn (x) => x > 4));
+print(x.filter(fn (e) => e > 5));

@@ -420,6 +420,7 @@ impl Compiler {
             );
             return;
         }
+
         // if there is an else clause we add after the block a jump that jumps over the else block
         // we now jump over the original block AND the unconditional jump over the else block.
         if tokens.match_token(TokenData::Keyword("else")) {
@@ -449,6 +450,11 @@ impl Compiler {
             self.patch_jump(
                 else_jump,
                 Instruction::Jump(self.get_instructions_count() - else_jump),
+            );
+        } else {
+            self.patch_jump(
+                jump,
+                Instruction::JumpIfFalse(self.get_instructions_count() - jump),
             );
         }
     }

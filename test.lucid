@@ -1,8 +1,9 @@
 import "std::List";
 
 let x = List.create();
-x.push_front(100);
-x.map(
-  fn (elem) => elem* 2
-);
-print(x.filter(fn (e) => e > 5));
+for i in range(2) {
+  print(i);
+  x.push_back(i);
+}
+print(x.ls);
+print(x.filter(fn (e) {return e > 2;} ));

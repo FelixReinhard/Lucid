@@ -15,6 +15,7 @@ fn List::push_back_range(self, elements) {
 }
 
 fn List::push_front(self, elem) {
+  print("WARNNING: Does not work idk man");
   if len(self.ls) == 0 {
     push(self.ls, elem);
     return;
@@ -93,7 +94,11 @@ fn List::any(self, func) {
 fn List::filter(self, func) {
   let new_ls = [];
   for elem in self.ls {
-    if func(elem) => push(new_ls, elem);
+    if func(elem) == true { 
+      push(new_ls, elem);
+      print(func(elem));
+      print(elem);
+    }
   }
   return new_ls;
 }
